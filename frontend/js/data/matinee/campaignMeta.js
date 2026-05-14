@@ -39,6 +39,7 @@ export const campaignMeta = [
     id: "unlock_criterion_goblin",
     archetypeId: "criterion_goblin",
     presentation: "overlay",
+    codeLabel: "How many criterions you got??",
     when: (state) => (state.stats?.winsByFranchise?.Arthouse || 0) >= 7
   },
 
@@ -57,6 +58,7 @@ export const campaignScreen = [
     id: "unlock_directors_cut_purist_on_campaign_clear",
     archetypeId: "directors_cut_purist",
     presentation: "screen",
+    codeLabel: "For you, my level 9 cinephile.",
     targetScreen: "unlockDirectorsCut",
     when: (state) => !!state.stats?.campaignCleared
   }

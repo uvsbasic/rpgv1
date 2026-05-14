@@ -1,5 +1,6 @@
 // frontend/js/data/matinee/extraSystems.js
 import { EXTRA_MOVIE_UNLOCK_RULES } from "./extraMovies.js";
+import { movies } from "../movies.js";
 import {
   ensureMatineeState,
   isMatineeMovieUnlocked,
@@ -46,6 +47,32 @@ function rulePasses(GameState, rule) {
   return all.length > 0 || any.length > 0;
 }
 
+function ensureUIEventQueue(GameState) {
+  if (!GameState) return;
+  if (!GameState.ui || typeof GameState.ui !== "object") GameState.ui = {};
+  if (!Array.isArray(GameState.ui.events)) GameState.ui.events = [];
+}
+
+function findMovieById(id) {
+  const key = String(id || "");
+  return (movies || []).find((m) => String(m?.id || "") === key) || null;
+}
+
+function emitMovieUnlockEvent(GameState, movieId) {
+  ensureUIEventQueue(GameState);
+  const m = findMovieById(movieId);
+  GameState.ui.events.push({
+    type: "MOVIE_UNLOCKED",
+    movieId: String(movieId || ""),
+    movieName: String(m?.title || movieId || "Unknown"),
+    archetypeName: String(m?.title || movieId || "Unknown"),
+    movieIds: [String(movieId || "")],
+    showOverlay: true,
+    codeLabel: "New movie unlocked.",
+    presentation: "overlay"
+  });
+}
+
 export function evaluateExtraMovieUnlocks(GameState) {
   ensureMatineeState(GameState);
   const unlockedNow = [];
@@ -54,7 +81,10 @@ export function evaluateExtraMovieUnlocks(GameState) {
     if (!rule?.movieId) continue;
     if (isMatineeMovieUnlocked(GameState, rule.movieId)) continue;
     if (!rulePasses(GameState, rule)) continue;
-    if (unlockMatineeMovie(GameState, rule.movieId)) unlockedNow.push(rule.movieId);
+    if (unlockMatineeMovie(GameState, rule.movieId)) {
+      unlockedNow.push(rule.movieId);
+      emitMovieUnlockEvent(GameState, rule.movieId);
+    }
   }
 
   if (unlockedNow.length) saveMatineeState(GameState);

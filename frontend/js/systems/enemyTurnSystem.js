@@ -221,6 +221,8 @@ export function runEnemyTurn(enemy, party, { funnyDisrupt = false, deferApply = 
 
   const actions = getActionsPerTurn(enemy);
   const moveIds = getMoveIds(enemy);
+  const isFilmProfessor = String(enemy?.id || "") === "film_professor";
+  let filmProfessorChoiceUsed = false;
   const events = [];
   const realEnemy = enemy;
   const simEnemy = cloneCombatantForSim(enemy);
@@ -231,6 +233,9 @@ export function runEnemyTurn(enemy, party, { funnyDisrupt = false, deferApply = 
   });
 
   for (let i = 0; i < actions; i++) {
+    const actionNumber = i + 1;
+    if (isFilmProfessor && filmProfessorChoiceUsed && actionNumber > 2) break;
+
     const alive = getAliveParty(simParty);
     if (alive.length === 0) return { events, partyDefeated: true };
 
@@ -238,7 +243,13 @@ export function runEnemyTurn(enemy, party, { funnyDisrupt = false, deferApply = 
     if (!targetSim) return { events, partyDefeated: true };
     const targetIndex = Number(targetSim.__realIndex);
 
-    const move = pickWeightedMove(moveIds);
+    const eligibleMoveIds =
+      isFilmProfessor && actionNumber > 2
+        ? moveIds.filter((id) => id !== "choice")
+        : moveIds;
+    const move = pickWeightedMove(eligibleMoveIds);
+    const usedChoiceThisAction = isFilmProfessor && String(move?.id || "") === "choice";
+    if (usedChoiceThisAction) filmProfessorChoiceUsed = true;
 
     if (move.kind !== "attack") {
       events.push({ type: "enemyMoveUnknown", enemyName: enemy?.name || "The enemy" });
@@ -432,6 +443,9 @@ export function runEnemyTurn(enemy, party, { funnyDisrupt = false, deferApply = 
     }
 
     // KO is now represented by the rolling counter reaching 0; do not emit immediate KO event here.
+
+    // Film professor rule: once "choice" is used, total actions for that turn are capped at 2.
+    if (isFilmProfessor && filmProfessorChoiceUsed && actionNumber >= 2) break;
   }
 
   // Restore enemy object if anything changed it outside simulation.

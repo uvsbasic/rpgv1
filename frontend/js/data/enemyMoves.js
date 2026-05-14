@@ -44,20 +44,25 @@ export const enemyMoves = {
     powerMultiplier: 5.0,
     weight: 20,
     lines: {
-      attackNormal: {
+      attackNormal:{ 
         lines: [
-          "{enemyName} looks over your work.",
-          "\"That was certainly a choice...\"",
-          "{targetName} is deeply affected."
-        ],
-        effectLineIndex: 2
-      },
-      attackCrit: "{enemyName} delivers a devastating {moveName}. CRITICAL on {targetName} for {totalDmg}!",
-      attackMortal: "{enemyName} declares \"a bold choice\" as {targetName} takes mortal damage!",
-      missDazed: "{enemyName} attempts {moveName}... but loses the thread and misses.",
-      confusedMisfire: "{enemyName} tries to use {moveName}, then second-guesses everything.",
-      confusedWildMiss: "{enemyName} overcommits to {moveName} and misses by a mile.",
-      confusedLowAccHit: "{enemyName} mutters \"interesting choice\" and lashes out anyway."
+          "{enemyName} looks over your work.", "\"That was certainly a choice...\"", 
+          "{targetName} is deeply affected.", "{totalDmg} damage is dealt!" ],
+        effectLineIndex: 2},
+      attackCrit:{ 
+        lines: [
+          "{enemyName} looks over your work.", "\"That was a BOLD choice...\"", 
+          "\"Is it supposed to look like that\"", "{targetName} is DEEPLY affected.", "{totalDmg} damage is dealt!" ],
+        effectLineIndex: 3},
+      attackMortal:{ 
+        lines: [
+          "{enemyName} looks over your work.", "\"That was certainly a choice...\"", 
+          "\"Is it supposed to look like that\"", "{targetName} is DEEPLY affected", "{totalDmg} of MORTAL damage is dealt!" ],
+        effectLineIndex: 3},
+      missDazed: "{enemyName} attempts to critique... but loses the thread and misses.",
+      confusedMisfire: "{enemyName} tries to critique, then second-guesses everything.",
+      confusedWildMiss: "{enemyName} overcommits to his critiques and misses by a mile.",
+      confusedLowAccHit: "{enemyName} mutters \"interesting choice\"."
     }
   }
 };

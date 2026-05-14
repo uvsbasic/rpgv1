@@ -9,7 +9,7 @@ import { playUIBackBlip, playUIMoveBlip, playUIConfirmBlip } from "../sfx/uiSfx.
 
 import { renderUnlockArcOverlay } from "./unlockArcOverlay.js";
 import { ensureUnlockState, isArchetypeUnlocked } from "../systems/unlockSystem.js";
-import { peekUnlockEvents, popNextUnlockEvent } from "../systems/unlockTriggers.js";
+import { peekUnlockEvents, popNextUnlockEventMatching } from "../systems/unlockTriggers.js";
 
 // ✅ Layered menu/nav music (Quickplay wants NAV mix: layer1+layer2)
 import { MenuLayers, NAV_MIX } from "../systems/menuLayeredMusic.js";
@@ -559,10 +559,13 @@ function handleUnlockEvents() {
   const events = peekUnlockEvents(GameState);
   if (!events.length) return;
 
-  const next = events.find((e) => e?.type === "ARCHETYPE_UNLOCKED");
+  const next = events.find((e) => e?.type === "ARCHETYPE_UNLOCKED" || e?.type === "MOVIE_UNLOCKED");
   if (!next) return;
 
-  const payload = popNextUnlockEvent(GameState);
+  const payload = popNextUnlockEventMatching(
+    GameState,
+    (e) => e?.type === "ARCHETYPE_UNLOCKED" || e?.type === "MOVIE_UNLOCKED"
+  );
   if (!payload) return;
 
   const name = payload.archetypeName || "New Archetype";

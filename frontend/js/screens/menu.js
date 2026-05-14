@@ -28,7 +28,7 @@ import { resetAllProgress } from "../systems/resetSystem.js";
 
 import { movies } from "../data/movies.js";
 import { renderUnlockArcOverlay } from "./unlockArcOverlay.js";
-import { peekUnlockEvents, popNextUnlockEvent } from "../systems/unlockTriggers.js";
+import { peekUnlockEvents, popNextUnlockEventMatching } from "../systems/unlockTriggers.js";
 import { playUIBackBlip, playUIConfirmBlip, playUIMoveBlip } from "../sfx/uiSfx.js";
 
 import { MenuLayers, MENU_MIX, SILENT_MIX } from "../systems/menuLayeredMusic.js";
@@ -144,10 +144,13 @@ function openOverlayIfAny() {
   const events = peekUnlockEvents(GameState);
   if (!events || !events.length) return;
 
-  const next = events.find((e) => e?.type === "ARCHETYPE_UNLOCKED" && e?.showOverlay);
+  const next = events.find((e) => (e?.type === "ARCHETYPE_UNLOCKED" || e?.type === "MOVIE_UNLOCKED") && e?.showOverlay);
   if (!next) return;
 
-  overlayPayload = popNextUnlockEvent(GameState);
+  overlayPayload = popNextUnlockEventMatching(
+    GameState,
+    (e) => (e?.type === "ARCHETYPE_UNLOCKED" || e?.type === "MOVIE_UNLOCKED") && e?.showOverlay
+  );
   if (overlayPayload) {
     uiMode = "unlock";
     enterArmed = false;

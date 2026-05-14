@@ -133,47 +133,38 @@ export const CampaignUnlockScreen = {
     const payload = getPayload() || {};
     const archetypeName = payload.archetypeName || "Unknown";
     const codeLabel = payload.codeLabel || "";
-    const party = (payload.movieIds || []).slice(0, 4).map(getMovieById);
+    const party = (payload.movieIds || []).slice(0, 4).map(getMovieById).filter(Boolean);
 
     const width = SCREEN.W;
     const height = SCREEN.H;
 
-    ctx.fillStyle = "rgba(0,0,0,0.75)";
-    ctx.fillRect(0, 0, width, height);
-
-    const px = L.panel.x;
-    const py = L.panel.y;
-    const pw = L.panel.w;
-    const ph = L.panel.h;
-
-    ctx.strokeStyle = "#fff";
+    // Screen-presentation unlocks: no dim-overlay/panel, clean full-screen background.
     ctx.fillStyle = "#000";
-    ctx.fillRect(px, py, pw, ph);
-    ctx.strokeRect(px, py, pw, ph);
+    ctx.fillRect(0, 0, width, height);
 
     ctx.textAlign = "center";
 
     ctx.fillStyle = "#ff0";
     ctx.font = "11px monospace";
-    ctx.fillText("Secret Unlocked!", Math.floor(width / 2), L.title.y);
+    ctx.fillText("Secret Unlocked!", Math.floor(width / 2), 24);
 
     ctx.fillStyle = "#fff";
     ctx.font = "8px monospace";
-    ctx.fillText(`Unlocked: ${archetypeName}`, Math.floor(width / 2), L.unlocked.y);
+    ctx.fillText(`Unlocked: ${archetypeName}`, Math.floor(width / 2), 38);
 
     ctx.fillStyle = "#aaa";
-    ctx.fillText(`${codeLabel}`, Math.floor(width / 2), L.code.y);
+    ctx.fillText(`${codeLabel}`, Math.floor(width / 2), 50);
 
     const posterW = QUICKPLAY_LAYOUT.poster.w;
     const posterH = QUICKPLAY_LAYOUT.poster.h;
     const gap = QUICKPLAY_LAYOUT.poster.gap;
-    const totalW = posterW * 4 + gap * 3;
+    const posterCount = Math.max(1, party.length);
+    const totalW = posterW * posterCount + gap * Math.max(0, posterCount - 1);
     const startX = Math.floor((width - totalW) / 2);
     const y = L.posters.y;
 
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < party.length; i++) {
       const m = party[i];
-      if (!m) continue;
       const x = startX + i * (posterW + gap);
       drawPoster(ctx, m, x, y, posterW, posterH);
     }

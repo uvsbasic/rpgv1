@@ -31,7 +31,7 @@ import { ImageCache } from "../core/ImageCache.js";
 import { movieMeta } from "../data/movieMeta.js";
 
 import { renderUnlockArcOverlay } from "./unlockArcOverlay.js";
-import { peekUnlockEvents, popNextUnlockEvent } from "../systems/unlockTriggers.js";
+import { peekUnlockEvents, popNextUnlockEventMatching } from "../systems/unlockTriggers.js";
 import { ensureMatineeState, recordCampaignRunStart } from "../data/matinee/storage.js";
 import { discoverSetsFromRoster, getActiveUnlockedSetIdsForRoster } from "../data/matinee/extraDiscovery.js";
 import { getMatineeSetArchetypes } from "../data/matinee/bonusSelectSets.js";
@@ -375,7 +375,7 @@ function findEnemyById(id) {
   return enemies.find((e) => String(e?.id || "") === key) || null;
 }
 
-function buildEggBattleProgressForMovie(movie, targetLevel = 9) {
+function buildEggBattleProgressForMovie(movie, targetLevel = 15) {
   const base = calculateMovieStats(movie || {});
   let maxHp = Math.max(1, Math.round(Number(base.maxHp || 1)));
   let atk = Math.max(1, Math.round(Number(base.atk || 1)));
@@ -509,12 +509,18 @@ function maybeOpenOverlayFromGlobalEvents() {
   const events = peekUnlockEvents(GameState);
   if (!events || !events.length) return;
 
-  const next = events.find(
-    (e) => e?.type === "ARCHETYPE_UNLOCKED" && e?.showOverlay && e?.archetypeId !== RATATOUILLE_ARCHETYPE_ID
-  );
+  const next = events.find((e) => {
+    if (!e?.showOverlay) return false;
+    if (e?.type === "MOVIE_UNLOCKED") return true;
+    return e?.type === "ARCHETYPE_UNLOCKED" && e?.archetypeId !== RATATOUILLE_ARCHETYPE_ID;
+  });
   if (!next) return;
 
-  state.overlayPayload = popNextUnlockEvent(GameState);
+  state.overlayPayload = popNextUnlockEventMatching(GameState, (e) => {
+    if (!e?.showOverlay) return false;
+    if (e?.type === "MOVIE_UNLOCKED") return true;
+    return e?.type === "ARCHETYPE_UNLOCKED" && e?.archetypeId !== RATATOUILLE_ARCHETYPE_ID;
+  });
   if (state.overlayPayload) {
     state.uiMode = "unlock";
     state.confirmPending = false;
@@ -1105,12 +1111,12 @@ function confirmPicks(baseVisible) {
   if (isEggBattle) {
     GameState.runMode = "campaign";
     GameState.enemyTemplate = findEnemyById("film_professor");
-    // Egg battle flow: force all selected actors to spawn with level-9 stats.
+    // Egg battle flow: force all selected actors to spawn with level-15 stats.
     const progressMap = {};
     for (const movie of (GameState.party.movies || [])) {
       const id = String(movie?.id || "");
       if (!id) continue;
-      progressMap[id] = buildEggBattleProgressForMovie(movie, 9);
+      progressMap[id] = buildEggBattleProgressForMovie(movie, 15);
     }
     GameState.party.progress = progressMap;
     if (!GameState.specialFlow || typeof GameState.specialFlow !== "object") {
@@ -2076,7 +2082,3 @@ export const SelectScreen = {
     }
   }
 };
-
-
-
-

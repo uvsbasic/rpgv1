@@ -132,14 +132,14 @@ export function renderUnlockArcOverlay(
   const posterH = QUICKPLAY_LAYOUT.poster.h;
   const gap = QUICKPLAY_LAYOUT.poster.gap;
 
-  const safeParty = (party || []).slice(0, 4);
-  const totalW = posterW * 4 + gap * 3;
+  const safeParty = (party || []).slice(0, 4).filter(Boolean);
+  const posterCount = Math.max(1, safeParty.length);
+  const totalW = posterW * posterCount + gap * Math.max(0, posterCount - 1);
   const startX = Math.floor((width - totalW) / 2);
   const y = L.posters.y;
 
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < safeParty.length; i++) {
     const m = safeParty[i];
-    if (!m) continue;
     const x = startX + i * (posterW + gap);
     drawPoster(ctx, m, x, y, posterW, posterH);
   }

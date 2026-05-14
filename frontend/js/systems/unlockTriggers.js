@@ -32,6 +32,21 @@ export function popNextUnlockEvent(GameState) {
   return GameState.ui.events.shift() || null;
 }
 
+export function popNextUnlockEventMatching(GameState, predicate) {
+  const events = Array.isArray(GameState?.ui?.events) ? GameState.ui.events : [];
+  if (!events.length || typeof predicate !== "function") return null;
+  const idx = events.findIndex((e) => {
+    try {
+      return !!predicate(e);
+    } catch {
+      return false;
+    }
+  });
+  if (idx < 0) return null;
+  const [event] = events.splice(idx, 1);
+  return event || null;
+}
+
 export function peekUnlockEvents(GameState) {
   return Array.isArray(GameState?.ui?.events) ? GameState.ui.events : [];
 }

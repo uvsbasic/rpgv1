@@ -27,6 +27,6 @@ export const EXTRA_MOVIE_UNLOCK_RULES = [
   { movieId: "the_mask", all: [{ type: "runs_with_movie", movieId: "ace_ventura_pet_detective", count: 2 }] },
   { movieId: "dumb_and_dumber", all: [{ type: "runs_with_movie", movieId: "the_mask", count: 2 }] },
   { movieId: "truman_show", all: [{ type: "runs_with_exact_lineup", movieIds: ["ace_ventura_pet_detective", "the_mask", "dumb_and_dumber", "batman_forever"], count: 1 }] },
-  { movieId: "superman_2", all: [{ type: "wins_with_archetype", archetypeId: "directors_cut_purist", count: 2 }] },
+  { movieId: "superman_2", all: [{ type: "runs_with_archetype", archetypeId: "directors_cut_purist", count: 2 }] },
   { movieId: "prince_of_darkness", all: [{ type: "set_unlocked", setId: "prince_of_darkness_set" }] }
 ];
