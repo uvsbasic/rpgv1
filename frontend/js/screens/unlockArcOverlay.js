@@ -6,6 +6,45 @@
 
 import { SCREEN, QUICKPLAY_LAYOUT, UNLOCK_OVERLAY_LAYOUT as L } from "../layout.js";
 
+const POSTER_BASE = "frontend/assets/posters/";
+const posterCache = new Map(); // id -> { img, loaded, failed }
+
+function startPosterLoad(movieId) {
+  if (!movieId) return null;
+  if (posterCache.has(movieId)) return posterCache.get(movieId);
+
+  const rec = { img: null, loaded: false, failed: false };
+  posterCache.set(movieId, rec);
+
+  const exts = ["png", "jpg", "jpeg", "webp"];
+  let idx = 0;
+
+  const img = new Image();
+  rec.img = img;
+
+  const tryNext = () => {
+    if (idx >= exts.length) {
+      rec.failed = true;
+      rec.loaded = false;
+      return;
+    }
+    const ext = exts[idx++];
+    img.src = `${POSTER_BASE}${movieId}.${ext}`;
+  };
+
+  img.onload = () => {
+    rec.loaded = true;
+    rec.failed = false;
+  };
+
+  img.onerror = () => {
+    tryNext();
+  };
+
+  tryNext();
+  return rec;
+}
+
 function drawPosterPlaceholder(ctx, movie, x, y, w, h) {
   ctx.strokeStyle = "#fff";
   ctx.strokeRect(x, y, w, h);
@@ -22,6 +61,37 @@ function drawPosterPlaceholder(ctx, movie, x, y, w, h) {
 
   ctx.fillText(line1, x + 3, y + h - 16);
   if (line2.trim()) ctx.fillText(line2, x + 3, y + h - 8);
+}
+
+function drawPoster(ctx, movie, x, y, w, h) {
+  const id = movie?.id ? String(movie.id) : "";
+  const rec = startPosterLoad(id);
+
+  ctx.strokeStyle = "#fff";
+  ctx.strokeRect(x, y, w, h);
+
+  ctx.fillStyle = "#111";
+  ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
+
+  if (!(rec && rec.loaded && rec.img)) {
+    drawPosterPlaceholder(ctx, movie, x, y, w, h);
+    return;
+  }
+
+  const iw = rec.img.naturalWidth || w;
+  const ih = rec.img.naturalHeight || h;
+
+  const scale = Math.min(w / iw, h / ih);
+  const dw = Math.floor(iw * scale);
+  const dh = Math.floor(ih * scale);
+  const dx = x + Math.floor((w - dw) / 2);
+  const dy = y + Math.floor((h - dh) / 2);
+
+  try {
+    ctx.drawImage(rec.img, dx, dy, dw, dh);
+  } catch {
+    drawPosterPlaceholder(ctx, movie, x, y, w, h);
+  }
 }
 
 export function renderUnlockArcOverlay(
@@ -71,7 +141,7 @@ export function renderUnlockArcOverlay(
     const m = safeParty[i];
     if (!m) continue;
     const x = startX + i * (posterW + gap);
-    drawPosterPlaceholder(ctx, m, x, y, posterW, posterH);
+    drawPoster(ctx, m, x, y, posterW, posterH);
   }
 
   // Instructions

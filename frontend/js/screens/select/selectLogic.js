@@ -188,18 +188,23 @@ export function getMetaEntryForMovieId(movieMeta, id) {
 
 export function getGenresForMovie(movieMeta, movie) {
   const id = movie?.id ? String(movie.id) : "";
-  if (!id) return [];
+  if (!id && !movie) return [];
 
   const meta = getMetaEntryForMovieId(movieMeta, id);
-  if (!meta) return [];
-
   const out = new Set();
   const list = [];
 
-  if (Array.isArray(meta.genres)) list.push(...meta.genres);
-  if (meta.primaryGenre) list.push(meta.primaryGenre);
-  if (meta.secondaryGenre) list.push(meta.secondaryGenre);
-  if (meta.genre) list.push(meta.genre);
+  if (meta) {
+    if (Array.isArray(meta.genres)) list.push(...meta.genres);
+    if (meta.primaryGenre) list.push(meta.primaryGenre);
+    if (meta.secondaryGenre) list.push(meta.secondaryGenre);
+    if (meta.genre) list.push(meta.genre);
+  }
+
+  if (Array.isArray(movie?.genres)) list.push(...movie.genres);
+  if (movie?.primaryGenre) list.push(movie.primaryGenre);
+  if (movie?.secondaryGenre) list.push(movie.secondaryGenre);
+  if (movie?.genre) list.push(movie.genre);
 
   for (const g of list) {
     const ng = normalizeGenreName(g);

@@ -5,6 +5,7 @@
 
 import { resetAllStats } from "./statsSystem.js";
 import { resetAllUnlocks } from "./unlockSystem.js";
+import { resetMatineeState } from "../data/matinee/storage.js";
 
 const LS_RATA_TRIAL = "rpg_ratatouille_trial_v1";
 const LS_SELECT_SLOT_IDS = "rpg_select_slot_ids_v1";
@@ -23,6 +24,7 @@ export function resetAllProgress(GameState, options = {}) {
   // 1) stats + unlocks
   resetAllStats(GameState);
   resetAllUnlocks(GameState);
+  resetMatineeState(GameState);
 
   // 2) wipe secrets/trials in memory
   if (!GameState.flags) GameState.flags = {};

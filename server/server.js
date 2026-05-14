@@ -63,6 +63,36 @@ function buildPosterUrl(posterPath) {
   return `${TMDB_IMAGE_BASE}/${POSTER_SIZE}${posterPath}`;
 }
 
+function normalizeCatalogGenreName(name) {
+  const s = String(name || "").trim().toLowerCase();
+  if (!s) return null;
+  const map = {
+    action: "ACTION",
+    adventure: "ADVENTURE",
+    animation: "ANIMATION",
+    comedy: "COMEDY",
+    crime: "CRIME",
+    documentary: "DRAMA",
+    drama: "DRAMA",
+    family: "FANTASY",
+    fantasy: "FANTASY",
+    history: "DRAMA",
+    horror: "HORROR",
+    music: "MUSICAL",
+    musical: "MUSICAL",
+    mystery: "MYSTERY",
+    romance: "ROMANCE",
+    "science fiction": "SCIFI",
+    "sci-fi": "SCIFI",
+    thriller: "THRILLER",
+    war: "ACTION",
+    western: "ADVENTURE",
+    tv: "DRAMA",
+    "tv movie": "DRAMA"
+  };
+  return map[s] || null;
+}
+
 async function tmdbGet(path, params = {}) {
   const url = new URL(TMDB_BASE + path);
   url.searchParams.set("api_key", TMDB_API_KEY);
@@ -132,6 +162,83 @@ app.get("/api/catalog/discover", async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: err?.message || "Discover failed" });
+  }
+});
+
+// SEARCH (query-first)
+// Example:
+//   /api/catalog/search?query=dune&page=1
+app.get("/api/catalog/search", async (req, res) => {
+  try {
+    const query = typeof req.query.query === "string" ? req.query.query.trim() : "";
+    if (!query) return res.json({ page: 1, totalPages: 1, results: [] });
+
+    const page = clampInt(req.query.page, 1, 500, 1);
+    const data = await tmdbGet("/search/movie", {
+      query,
+      page,
+      include_adult: "false",
+      language: "en-US"
+    });
+
+    const raw = Array.isArray(data.results) ? data.results : [];
+
+    // Enrich search hits with per-movie details so gameplay-critical fields
+    // (runtime / rating / genre pair) are accurate at selection time.
+    const detailById = new Map();
+    await Promise.all(
+      raw.map(async (m) => {
+        const pid = Number(m?.id);
+        if (!Number.isFinite(pid)) return;
+        try {
+          const d = await tmdbGet(`/movie/${pid}`, { language: "en-US" });
+          detailById.set(pid, d);
+        } catch {
+          // Keep search resilient: fallback to list payload if details fails.
+        }
+      })
+    );
+
+    const results = raw.map((m) => {
+      const pid = Number(m?.id);
+      const d = Number.isFinite(pid) ? detailById.get(pid) : null;
+      const title = m.title || m.original_title || "Untitled";
+      const year = m.release_date ? Number(String(m.release_date).slice(0, 4)) : null;
+      const detailGenres = Array.isArray(d?.genres) ? d.genres.map((g) => String(g?.name || "")).filter(Boolean) : [];
+      const normalizedGenres = detailGenres
+        .map((g) => normalizeCatalogGenreName(g))
+        .filter(Boolean);
+      const uniqueNormGenres = Array.from(new Set(normalizedGenres));
+      return {
+        id: `tmdb_${m.id}`,
+        provider: "tmdb",
+        providerId: m.id,
+        title,
+        shortTitle: title,
+        year: Number.isFinite(year) ? year : null,
+        runtime: Number.isFinite(Number(d?.runtime)) ? Number(d.runtime) : null,
+        imdb: Number.isFinite(Number(d?.vote_average))
+          ? Number(d.vote_average)
+          : (Number.isFinite(Number(m?.vote_average)) ? Number(m.vote_average) : null),
+        rating: Number.isFinite(Number(d?.vote_average))
+          ? Number(d.vote_average)
+          : (Number.isFinite(Number(m?.vote_average)) ? Number(m.vote_average) : null),
+        genres: detailGenres,
+        primaryGenre: uniqueNormGenres[0] || null,
+        secondaryGenre: uniqueNormGenres[1] || null,
+        release_date: m.release_date || "",
+        posterUrl: buildPosterUrl(m.poster_path),
+        backdropUrl: m.backdrop_path ? `${TMDB_IMAGE_BASE}/w780${m.backdrop_path}` : null
+      };
+    });
+
+    res.json({
+      page: data.page || page,
+      totalPages: data.total_pages || 1,
+      results
+    });
+  } catch (err) {
+    res.status(500).json({ error: err?.message || "Search failed" });
   }
 });
 

@@ -54,6 +54,8 @@ export const EnemyIntroScreen = {
   },
 
   update(mouse) {
+    const isJesseFlow = String(GameState?.specialFlow?.type || "") === "eggBattle";
+
     if (!Input.isDown("Enter")) {
       enterArmed = true;
     }
@@ -64,9 +66,8 @@ export const EnemyIntroScreen = {
 
     const tap = getTapAction(mouse);
     if (tap === "back") {
-      // "back if possible" — for Quickplay enemy intro, reasonable back is Quickplay
       playUIBackBlip();
-      changeScreen("quickplay");
+      changeScreen(isJesseFlow ? "startingItemsPick" : "quickplay");
       return;
     }
     if (tap === "confirm") {
@@ -74,6 +75,7 @@ export const EnemyIntroScreen = {
         enterArmed = false;
         GameState.enemy = null;
         playUIConfirmBlip();
+        if (isJesseFlow) GameState.specialFlow = null;
         changeScreen("battle");
         return;
       }
@@ -86,6 +88,7 @@ export const EnemyIntroScreen = {
       GameState.enemy = null;
 
       playUIConfirmBlip();
+      if (isJesseFlow) GameState.specialFlow = null;
       changeScreen("battle");
     }
   },

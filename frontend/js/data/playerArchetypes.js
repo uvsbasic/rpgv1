@@ -17,9 +17,9 @@ export const playerArchetypes = [
   { id: "romcom_apologist", name: "Rom-Com Apologist", movieIds: ["when_harry_met_sally", "ten_things_i_hate_about_you", "crazy_rich_asians", "notting_hill"], hidden: false },
   { id: "foreign_cinema_nerd", name: "Foreign Cinema Nerd", movieIds: ["parasite", "amelie", "pans_labyrinth", "oldboy_2003"], hidden: false },
   { id: "film_school_professor", name: "Film School Professor", movieIds: ["casablanca", "citizen_kane", "singin_in_the_rain", "rear_window"], hidden: false },
-  { id: "test", name: "Test", movieIds: ["everything_everywhere","everything_everywhere","everything_everywhere","everything_everywhere"], hidden: false },
-  { id: "2est", name: "2est", movieIds: ["love_and_mercy","office_space","purple_rain","steve_jobs_2015"], hidden: false },
-  { id: "vest", name: "Vest", movieIds: ["howls_moving_castle","midsommar","wicked","wicked_for_good"], hidden: false },
+  { id: "test", name: "Test", movieIds: ["everything_everywhere","everything_everywhere","everything_everywhere","everything_everywhere"], hidden: true },
+  { id: "2est", name: "2est", movieIds: ["love_and_mercy","office_space","purple_rain","steve_jobs_2015"], hidden: true },
+  { id: "vest", name: "Vest", movieIds: ["howls_moving_castle","midsommar","wicked","wicked_for_good"], hidden: true },
   
 
   // ===== HIDDEN / FINAL ARCHETYPES (PER YOUR FINALIZED LIST) =====
@@ -35,6 +35,7 @@ export const playerArchetypes = [
   { id: "criterion_goblin", name: "Criterion Goblin", movieIds: ["seven_samurai", "persona", "eight_half", "the_400_blows"], hidden: true },
   // 🎬 Director’s Cut Purist
   { id: "directors_cut_purist", name: "Director’s Cut Purist", movieIds: ["blade_runner_final_cut", "once_upon_a_time_in_america", "apocalypse_now", "lotr_return_king"], hidden: true },
+  { id: "test_test", legacyName: "Final Exam", name: "????>>? ??>????", movieIds: ["mystery_train", "wings_of_desire", "mandy_2018", "do_the_right_thing"], hidden: true },
 
 
 

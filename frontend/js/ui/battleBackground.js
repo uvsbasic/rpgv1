@@ -6,7 +6,7 @@
 // - Scanline warp WITHOUT destination-Y offsets (prevents internal black gaps).
 // - No trails: frame/post cleared each render; no accumulation.
 //
-// Themes via enemy.bgTheme: Internet / Snob / Cinephile / Art / Comfort
+// Themes via enemy.bgTheme: Internet / Snob / Cinephile / Art / Comfort / Coding
 // - If missing/unknown OR "Disney" -> CLASSIC
 //
 // Modularization:
@@ -26,6 +26,7 @@ import * as SnobTheme from "./battleBackgoundThemes/Snob.js";
 import * as CinephileTheme from "./battleBackgoundThemes/Cinephile.js";
 import * as ArtTheme from "./battleBackgoundThemes/Art.js";
 import * as ComfortTheme from "./battleBackgoundThemes/Comfort.js";
+import * as CodingTheme from "./battleBackgoundThemes/Coding.js";
 
 const THEMES = {
   CLASSIC: { key: "CLASSIC" },
@@ -33,7 +34,9 @@ const THEMES = {
   Snob: { key: "Snob" },
   Comfort: { key: "Comfort" },
   Art: { key: "Art" },
-  Cinephile: { key: "Cinephile" }
+  Cinephile: { key: "Cinephile" },
+  // Placeholder visual theme for coding encounters.
+  Coding: { key: "Coding" }
 };
 
 const THEME_IMPL = {
@@ -42,7 +45,8 @@ const THEME_IMPL = {
   Snob: SnobTheme,
   Comfort: ComfortTheme,
   Art: ArtTheme,
-  Cinephile: CinephileTheme
+  Cinephile: CinephileTheme,
+  Coding: CodingTheme
 };
 
 export function createBattleBackground({ width, height }) {
@@ -186,14 +190,17 @@ export function createBattleBackground({ width, height }) {
     drawThemeBase(bctx, srcW, srcH, pal);
 
     // 2) warp -> frame (no dest-y offset => no internal black gaps)
+    const swayX = activeThemeKey === "Coding" ? 0 : driftX;
+    const swayY = activeThemeKey === "Coding" ? 0 : driftY;
+
     drawWarpedScanlines(fctx, bctx, {
       viewW: width,
       viewH: height,
       srcW,
       srcH,
       t,
-      driftX,
-      driftY,
+      driftX: swayX,
+      driftY: swayY,
       overscanX: OVERSCAN_X,
       overscanY: OVERSCAN_Y,
       ampX: warpAmpX,
@@ -238,6 +245,9 @@ export function createBattleBackground({ width, height }) {
     } else if (activeThemeKey === "Cinephile") {
       driftRateX = rand(0.48, 0.76);
       driftRateY = rand(0.40, 0.70);
+    } else if (activeThemeKey === "Coding") {
+      driftRateX = rand(0.44, 0.72);
+      driftRateY = rand(0.34, 0.58);
     } else {
       driftRateX = rand(0.40, 0.78);
       driftRateY = rand(0.34, 0.66);
@@ -306,6 +316,11 @@ export function createBattleBackground({ width, height }) {
       warpAmpY *= 0.95;
       warpSpeedMul *= 1.25;
       warpPulseStrength *= 0.65;
+    } else if (activeThemeKey === "Coding") {
+      warpAmpX *= 0.62;
+      warpAmpY *= 0.60;
+      warpSpeedMul *= 0.96;
+      warpPulseStrength *= 0.50;
     }
   }
 
@@ -410,6 +425,23 @@ export function createBattleBackground({ width, height }) {
       return;
     }
 
+    if (activeThemeKey === "Coding") {
+      // Placeholder coding vibe: cool monitor tint + subtle bloom.
+      ctx.save();
+      ctx.globalCompositeOperation = "screen";
+      ctx.globalAlpha = 0.06 + 0.01 * (i - 1);
+      ctx.fillStyle = mix < 0.5 ? "rgba(100,255,210,1)" : "rgba(120,190,255,1)";
+      ctx.fillRect(0, 0, w, h);
+      ctx.restore();
+
+      ctx.save();
+      ctx.globalAlpha = 0.12;
+      ctx.filter = "blur(1.1px)";
+      ctx.drawImage(post, 0, 0);
+      ctx.restore();
+      return;
+    }
+
     // Classic: tiny unify tint
     ctx.save();
     ctx.globalAlpha = 0.06;
@@ -470,6 +502,10 @@ function drawWarpedScanlines(dstCtx, srcCtx, opts) {
     freqA = 0.020;
     freqB = 0.010;
     freqY = 0.012;
+  } else if (themeKey === "Coding") {
+    freqA = 0.016;
+    freqB = 0.008;
+    freqY = 0.009;
   }
 
   const phase = t * (24 * (speedMul ?? 1.0));
@@ -523,6 +559,7 @@ function drawWarpedScanlines(dstCtx, srcCtx, opts) {
     themeKey === "Internet" ? 0.04 :
     themeKey === "Comfort" ? 0.05 :
     themeKey === "Art" ? 0.06 :
+    themeKey === "Coding" ? 0.04 :
     themeKey === "Cinephile" ? 0.05 :
     0.06;
 
@@ -603,6 +640,13 @@ function makeThemePalette(themeKey, opts = {}) {
     return { c1: base, c2: neon1, c3: neon2 };
   }
 
+  if (themeKey === "Coding") {
+    const c1 = `rgb(${randInt(4, 20)},${randInt(16, 40)},${randInt(18, 48)})`;
+    const c2 = Math.random() < 0.5 ? "rgb(85,255,190)" : "rgb(92,200,255)";
+    const c3 = Math.random() < 0.5 ? "rgb(35,120,95)" : "rgb(38,95,140)";
+    return { c1, c2, c3 };
+  }
+
   // CLASSIC fallback
   return {
     c1: randomRgbWithZeroChannel(),
@@ -618,6 +662,7 @@ function themePaletteSpeed(themeKey, intensity) {
   if (themeKey === "Cinephile") return 0.030 + 0.006 * (i - 1);
   if (themeKey === "Art") return 0.028 + 0.1 * (i - 1);
   if (themeKey === "Comfort") return 0.040 + 0.012 * (i - 1);
+  if (themeKey === "Coding") return 0.032 + 0.008 * (i - 1);
   return 0.030;
 }
 

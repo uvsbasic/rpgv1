@@ -62,7 +62,18 @@ const ERA_BONUSES = {
 
 function getMetaForMovie(movie) {
   if (!movie || !movie.id) return null;
-  return movieMeta[movie.id] || null;
+  const known = movieMeta[movie.id] || null;
+  if (known) return known;
+
+  const primary = String(movie?.primaryGenre || "").trim().toUpperCase();
+  const secondary = String(movie?.secondaryGenre || "").trim().toUpperCase();
+  const year = Number(movie?.year ?? movie?.releaseYear ?? movie?.release_date?.slice?.(0, 4));
+  return {
+    primaryGenre: primary || null,
+    secondaryGenre: secondary || null,
+    tone: null,
+    year: Number.isFinite(year) ? year : null
+  };
 }
 
 function getEraFromYear(year) {

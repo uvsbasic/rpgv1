@@ -11,8 +11,12 @@ import { LevelIntroScreen } from "./screens/levelIntro.js";
 import { FirstPickScreen } from "./screens/firstPick.js";
 import { FourthPickScreen } from "./screens/fourthPick.js";
 import { StartingItemsPickScreen } from "./screens/startingItemsPick.js";
+import { BattleRewardScreen } from "./screens/battleReward.js";
+import { IntermissionScreen } from "./screens/intermission.js";
 import { QuickplayScreen } from "./screens/quickplay.js";
 import { EnemyIntroScreen } from "./screens/enemyIntro.js";
+import { ReportBugsScreen } from "./screens/reportbugs.js";
+import { CampaignUnlockScreen } from "./screens/metaScreen.js";
 
 import { DevBattleSelectScreen } from "./screens/devBattleSelect.js";
 
@@ -21,6 +25,7 @@ import { updateCurrentScreen, renderCurrentScreen } from "./core/Renderer.js";
 
 import { ensureUnlockState } from "./systems/unlockSystem.js";
 import { runUnlockTriggers } from "./systems/unlockTriggers.js";
+import { ensureMatineeState } from "./data/matinee/storage.js";
 import { ConfirmHold } from "./systems/confirmHoldEngine.js";
 import { Input } from "./ui.js";
 
@@ -31,6 +36,7 @@ export { GameState };
 
 // ✅ One-time unlock init (loads localStorage into GameState.unlocks)
 ensureUnlockState(GameState);
+ensureMatineeState(GameState);
 ConfirmHold.init();
 
 const screens = {
@@ -42,9 +48,13 @@ const screens = {
   firstPick: FirstPickScreen,
   fourthPick: FourthPickScreen,
   startingItemsPick: StartingItemsPickScreen,
+  battleReward: BattleRewardScreen,
+  intermission: IntermissionScreen,
   battle: BattleScreen,
   quickplay: QuickplayScreen,
   enemyIntro: EnemyIntroScreen,
+  reportbugs: ReportBugsScreen,
+  campaignUnlock: CampaignUnlockScreen,
 
   devBattleSelect: DevBattleSelectScreen
 };

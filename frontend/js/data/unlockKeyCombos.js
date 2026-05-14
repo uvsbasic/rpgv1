@@ -21,7 +21,6 @@ export const unlockKeyCombos = [
     showOverlay: true,
 
     // ✅ NEW: where Enter on the overlay should go
-    confirmToScreen: "enemyIntro",
 
     screens: ["quickplay", "menu", "select"]
   }

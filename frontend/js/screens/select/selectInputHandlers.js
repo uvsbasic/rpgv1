@@ -325,6 +325,9 @@ export function handleRandomizeActions({
 
     const next = randomizeSlots({ SLOT_COUNT: state.SLOT_COUNT, baseLen: baseVisible.length, displayToBase });
     if (next) state.slots = next;
+    if (Array.isArray(state.expandedSlotOverrides)) {
+      state.expandedSlotOverrides = new Array(state.SLOT_COUNT).fill(null);
+    }
 
     state.confirmPending = false;
     persist();
@@ -350,6 +353,9 @@ export function handleRandomizeActions({
     else {
       const next = randomizeSlots({ SLOT_COUNT: state.SLOT_COUNT, baseLen: baseVisible.length, displayToBase });
       if (next) state.slots = next;
+    }
+    if (Array.isArray(state.expandedSlotOverrides)) {
+      state.expandedSlotOverrides = new Array(state.SLOT_COUNT).fill(null);
     }
 
     state.confirmPending = false;

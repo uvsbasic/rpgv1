@@ -6,6 +6,7 @@
 export const LS_LAST_SCREEN = "rpg_last_screen";
 export const LS_SELECT_SLOT_IDS = "rpg_select_slot_ids_v1";
 export const LS_SELECT_UI = "rpg_select_ui_v1";
+export const LS_SELECT_SETTINGS = "rpg_select_settings_v1";
 
 export function safeGetLS(key) {
   try {
@@ -67,10 +68,30 @@ export function readPersistedUI() {
   }
 }
 
+export function readPersistedSelectSettings() {
+  const raw = safeGetLS(LS_SELECT_SETTINGS);
+  if (!raw) return null;
+  try {
+    const obj = JSON.parse(raw);
+    return obj && typeof obj === "object" ? obj : null;
+  } catch {
+    return null;
+  }
+}
+
+export function persistSelectSettings(settings) {
+  safeSetLS(LS_SELECT_SETTINGS, JSON.stringify(settings || {}));
+}
+
 // Convert current state.slots (base indices or tokens) into persisted IDs/tokens.
-export function getSlotIdsFromBase({ SLOT_COUNT, slots, baseVisible }) {
+export function getSlotIdsFromBase({ SLOT_COUNT, slots, baseVisible, expandedSlotOverrides = null }) {
   const ids = [];
   for (let i = 0; i < SLOT_COUNT; i++) {
+    const overrideId = String(expandedSlotOverrides?.[i] || "");
+    if (overrideId) {
+      ids.push(overrideId);
+      continue;
+    }
     const v = slots?.[i];
     if (typeof v === "string") {
       ids.push(v);
@@ -116,7 +137,12 @@ export function persistSelectStateByBase({
   state,
   baseVisible
 }) {
-  const ids = getSlotIdsFromBase({ SLOT_COUNT, slots: state.slots, baseVisible });
+  const ids = getSlotIdsFromBase({
+    SLOT_COUNT,
+    slots: state.slots,
+    baseVisible,
+    expandedSlotOverrides: state.expandedSlotOverrides
+  });
   safeSetLS(LS_SELECT_SLOT_IDS, JSON.stringify(ids));
 
   const ui = {

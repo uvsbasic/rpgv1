@@ -86,6 +86,7 @@ function getActionsPerTurn(enemy) {
 }
 
 function getMoveIds(enemy) {
+  if (Array.isArray(enemy?.moveIds) && enemy.moveIds.length > 0) return enemy.moveIds;
   if (Array.isArray(enemy?.moves) && enemy.moves.length > 0) return enemy.moves;
   return ["basic_attack"];
 }
@@ -255,6 +256,7 @@ export function runEnemyTurn(enemy, party, { funnyDisrupt = false, deferApply = 
           events.push({
             type: "enemyConfusedMisfire",
             enemyName: enemy?.name || "The enemy",
+            moveId: move?.id || "basic_attack",
             moveName: move?.name || "Attack"
           });
           confusion.procChance = clamp(confusion.procChance + confusion.rampProc, 0, 0.98);
@@ -305,6 +307,7 @@ export function runEnemyTurn(enemy, party, { funnyDisrupt = false, deferApply = 
           events.push({
             type: "enemyConfusedWildMiss",
             enemyName: enemy?.name || "The enemy",
+            moveId: move?.id || "basic_attack",
             moveName: move?.name || "Attack"
           });
           confusion.procChance = clamp(confusion.procChance + confusion.rampProc, 0, 0.98);
@@ -325,6 +328,7 @@ export function runEnemyTurn(enemy, party, { funnyDisrupt = false, deferApply = 
         events.push({
           type: "enemyConfusedLowAccuracyHit",
           enemyName: enemy?.name || "The enemy",
+          moveId: move?.id || "basic_attack",
           moveName: move?.name || "Attack"
         });
         confusion.procChance = clamp(confusion.procChance + confusion.rampProc, 0, 0.98);
@@ -347,6 +351,7 @@ export function runEnemyTurn(enemy, party, { funnyDisrupt = false, deferApply = 
       events.push({
         type: "enemyMissDazed",
         enemyName: enemy?.name || "The enemy",
+        moveId: move?.id || "basic_attack",
         moveName: move?.name || "Attack"
       });
       continue;
@@ -402,6 +407,7 @@ export function runEnemyTurn(enemy, party, { funnyDisrupt = false, deferApply = 
     const hitEvent = {
       type: "enemyAttackHit",
       enemyName: enemy?.name || "The enemy",
+      moveId: move?.id || "basic_attack",
       moveName: move?.name || "Attack",
       targetName: who,
       damage: finalDamage,

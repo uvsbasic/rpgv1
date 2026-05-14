@@ -204,7 +204,16 @@ function buildUnlockedHiddenList() {
 function getQuickplayArchetypes() {
   const defaults = buildDefaultTen();
   const unlocked = buildUnlockedHiddenList();
-  return [...defaults, ...unlocked];
+  const list = [...defaults, ...unlocked];
+
+  // Keep test_test pinned to the end when unlocked.
+  const idx = list.findIndex((a) => a?.id === "test_test");
+  if (idx > -1) {
+    const [pinned] = list.splice(idx, 1);
+    list.push(pinned);
+  }
+
+  return list;
 }
 
 // -------------------------
@@ -629,6 +638,17 @@ export const QuickplayScreen = {
 
       if (enterArmed && consumeConfirmIfPressed()) {
         enterArmed = false;
+        playUIConfirmBlip();
+        const payload = overlayPayload || {};
+        const isImdbUnlock =
+          String(payload.comboId || "") === "imdb_code" ||
+          String(payload.archetypeId || "") === "imdb_minmaxer";
+
+        if (isImdbUnlock) {
+          uiMode = "select";
+          overlayPayload = null;
+          return;
+        }
 
         GameState.enemyTemplate = null;
         GameState.enemy = null;

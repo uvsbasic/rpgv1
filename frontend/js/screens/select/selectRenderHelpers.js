@@ -57,6 +57,7 @@ export function getNameplateTitle(movie) {
 export function getLocalPosterPath(movie) {
   const id = movie?.id ? String(movie.id) : "";
   if (!id) return null;
+  if (id.startsWith("tmdb_")) return null;
   return `frontend/assets/posters/${id}.jpg`;
 }
 

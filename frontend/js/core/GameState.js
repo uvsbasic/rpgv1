@@ -15,7 +15,7 @@ export const GameState = {
 
   // Campaign level system
   currentLevel: 1,
-  maxLevel: 9,
+  maxLevel: 15,
 
   campaign: {
     onefourShown: false,
@@ -29,9 +29,14 @@ export const GameState = {
   // Enemy chosen for the current level (template from data/enemies.js)
   enemyTemplate: null,
 
+  // Optional one-off special flow hooks (e.g. report-bug keyword route)
+  specialFlow: null,
+
   // ✅ Unlock persistence state (loaded from localStorage by ensureUnlockState)
   // (game.js already calls ensureUnlockState(GameState) once)
   unlocks: null,
+  matinee: null,
+  catalog: null,
 
   // ✅ Global flags (secrets, applied rule bookkeeping)
   flags: {
@@ -49,6 +54,7 @@ export const GameState = {
     wins: 0,
     losses: 0,
     campaignCleared: false,
+    campaignCompletions: 0,
 
     // optional placeholders used by example rules
     mealsCooked: 0,

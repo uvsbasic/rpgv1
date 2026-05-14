@@ -6,7 +6,7 @@ import { createLocalSearchProvider } from "./providers/localProvider.js";
 import { createTmdbSearchProvider } from "./providers/tmdbProvider.js";
 
 const MODE_LOCAL = "local";
-const MODE_TMDB = "tmdb";
+const MODE_EXPANDED = "expanded";
 const SEARCH_MODE_KEY = "rpg_select_search_mode_v1";
 
 const localProvider = createLocalSearchProvider();
@@ -26,25 +26,17 @@ function safeSetLS(key, value) {
 }
 
 function normalizeMode(mode) {
-  return mode === MODE_TMDB ? MODE_TMDB : MODE_LOCAL;
+  const m = String(mode || "").trim().toLowerCase();
+  if (m === MODE_EXPANDED || m === "tmdb") return MODE_EXPANDED;
+  return MODE_LOCAL;
 }
 
 function getModeFromStateOrStorage(state) {
   const inState = String(state?.search?.mode || "").trim().toLowerCase();
-  if (inState === MODE_LOCAL || inState === MODE_TMDB) return inState;
+  if (inState === MODE_LOCAL || inState === MODE_EXPANDED) return inState;
   const fromLs = String(safeGetLS(SEARCH_MODE_KEY) || "").trim().toLowerCase();
-  if (fromLs === MODE_LOCAL || fromLs === MODE_TMDB) return fromLs;
+  if (fromLs === MODE_LOCAL || fromLs === MODE_EXPANDED) return fromLs;
   return MODE_LOCAL;
-}
-
-function getTmdbApiKeyFromState(state) {
-  const keyFromState = String(state?.search?.tmdbApiKey || "").trim();
-  if (keyFromState) return keyFromState;
-
-  const keyFromWindow = String(window?.TMDB_API_KEY || "").trim();
-  if (keyFromWindow) return keyFromWindow;
-
-  return String(safeGetLS("tmdb_api_key") || "").trim();
 }
 
 export function ensureSearchControllerState(state) {
@@ -80,7 +72,7 @@ export function ensureSearchControllerState(state) {
 function getTmdbProvider(state) {
   ensureSearchControllerState(state);
   const ctl = state.search.controller;
-  const key = getTmdbApiKeyFromState(state);
+  const key = "";
 
   if (!ctl.tmdbProvider || ctl.tmdbProviderApiKey !== key) {
     ctl.tmdbProviderApiKey = key;
@@ -93,7 +85,7 @@ function getTmdbProvider(state) {
 
 function getProviderForMode(state) {
   const mode = normalizeMode(state?.search?.mode);
-  if (mode === MODE_TMDB) return getTmdbProvider(state);
+  if (mode === MODE_EXPANDED) return getTmdbProvider(state);
   return localProvider;
 }
 

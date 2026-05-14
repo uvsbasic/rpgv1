@@ -4,7 +4,7 @@
 // Call ONCE per frame (recommended from game.js update()).
 //
 // Responsibilities:
-// - Evaluate predicate unlockRules (rules.when(GameState)).
+// - Evaluate predicate campaign unlocks (rules.when(GameState)).
 // - Track key-sequence combos (unlockKeyCombos) using Input (single-char).
 // - When an unlock happens: persist via unlockSystem + emit UI event into GameState.ui.events.
 //
@@ -13,7 +13,7 @@
 // - Supports combo.screens restriction and combo.confirmToScreen for overlay routing.
 //
 
-import { unlockRules } from "../data/unlockRules.js";
+import { campaignUnlocks } from "../data/matinee/campaignMeta.js";
 import { unlockKeyCombos } from "../data/unlockKeyCombos.js";
 import { playerArchetypes } from "../data/playerArchetypes.js";
 import { ensureUnlockState, unlockArchetype, isArchetypeUnlocked } from "./unlockSystem.js";
@@ -34,6 +34,26 @@ export function popNextUnlockEvent(GameState) {
 
 export function peekUnlockEvents(GameState) {
   return Array.isArray(GameState?.ui?.events) ? GameState.ui.events : [];
+}
+
+function isScreenUnlockEvent(e) {
+  return e?.type === "ARCHETYPE_UNLOCKED" && e?.presentation === "screen";
+}
+
+export function hasPendingScreenUnlockEvent(GameState) {
+  const events = peekUnlockEvents(GameState);
+  return events.some(isScreenUnlockEvent);
+}
+
+export function popNextScreenUnlockEvent(GameState) {
+  const events = peekUnlockEvents(GameState);
+  if (!events.length) return null;
+
+  const idx = events.findIndex(isScreenUnlockEvent);
+  if (idx < 0) return null;
+
+  const [event] = events.splice(idx, 1);
+  return event || null;
 }
 
 // ---------------------------
@@ -70,20 +90,24 @@ function tryUnlockArchetype(GameState, archetypeId, meta = {}) {
 
   const archetype = findArchetypeById(id);
 
-  emitUnlockEvent(GameState, {
-    ruleId: meta.ruleId ?? null,
-    comboId: meta.comboId ?? null,
+  if (meta.emitEvent !== false) {
+    emitUnlockEvent(GameState, {
+      ruleId: meta.ruleId ?? null,
+      comboId: meta.comboId ?? null,
 
-    archetypeId: id,
-    archetypeName: archetype?.name || id,
-    movieIds: archetype?.movieIds || [],
+      archetypeId: id,
+      archetypeName: archetype?.name || id,
+      movieIds: archetype?.movieIds || [],
 
-    showOverlay: meta.showOverlay !== false, // default true
-    codeLabel: meta.codeLabel ?? null,
+      showOverlay: meta.showOverlay !== false, // default true
+      codeLabel: meta.codeLabel ?? null,
+      presentation: meta.presentation ?? "overlay",
+      targetScreen: meta.targetScreen ?? null,
 
-    // Menu can route based on this (IMDB -> enemyIntro, others -> close-only)
-    confirmToScreen: meta.confirmToScreen ?? null
-  });
+      // Menu can route based on this (IMDB -> enemyIntro, others -> close-only)
+      confirmToScreen: meta.confirmToScreen ?? null
+    });
+  }
 
   return true;
 }
@@ -92,7 +116,7 @@ function tryUnlockArchetype(GameState, archetypeId, meta = {}) {
 // Predicate rules
 // ---------------------------
 function runPredicateRules(GameState) {
-  for (const rule of unlockRules || []) {
+  for (const rule of campaignUnlocks || []) {
     if (!rule || typeof rule.when !== "function") continue;
 
     const archetypeId = rule.archetypeId;
@@ -107,11 +131,17 @@ function runPredicateRules(GameState) {
 
     if (!shouldUnlock) continue;
 
+    const presentation = rule.presentation === "screen" ? "screen" : "overlay";
+    const showOverlayDefault = presentation === "overlay";
+
     tryUnlockArchetype(GameState, archetypeId, {
       ruleId: rule.id || null,
-      showOverlay: rule.showOverlay !== false,
+      showOverlay: rule.showOverlay ?? showOverlayDefault,
       codeLabel: rule.codeLabel || null,
-      confirmToScreen: rule.confirmToScreen || null
+      presentation,
+      targetScreen: rule.targetScreen || null,
+      confirmToScreen: rule.confirmToScreen || null,
+      emitEvent: rule.emitEvent !== false
     });
   }
 }

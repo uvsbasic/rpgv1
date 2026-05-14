@@ -21,7 +21,7 @@
 //     getUnlockedArchetypeOrder
 //   } from "../systems/unlockSystem.js";
 
-import { unlockRules } from "../data/unlockRules.js";
+import { campaignUnlocks } from "../data/matinee/campaignMeta.js";
 
 const STORAGE_KEY = "movie_rpg_unlocks_v1";
 
@@ -198,7 +198,7 @@ export function lockArchetype(GameState, archetypeId) {
 }
 
 /**
- * Evaluate declarative unlock rules (frontend/js/data/unlockRules.js).
+ * Evaluate declarative unlock rules (frontend/js/data/matinee/campaignMeta.js).
  * Calls unlockArchetype() for any rule that returns true.
  *
  * Returns a list of archetypeIds that were newly unlocked.
@@ -207,7 +207,7 @@ export function evaluateUnlockRules(GameState) {
   ensureUnlockState(GameState);
 
   const unlockedNow = [];
-  const rules = Array.isArray(unlockRules) ? unlockRules : [];
+  const rules = Array.isArray(campaignUnlocks) ? campaignUnlocks : [];
 
   for (const rule of rules) {
     const archetypeId = rule?.archetypeId;

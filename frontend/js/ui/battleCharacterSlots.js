@@ -11,21 +11,26 @@
 
 const _posterCache = new Map();
 
-function _getPosterImage(movieId) {
-  if (!movieId) return null;
+function _getPosterImage(movie) {
+  const movieId = String(movie?.id || "");
+  const remoteUrl = String(movie?.posterUrl || "").trim();
+  const key = remoteUrl || movieId;
+  if (!key) return null;
 
-  let rec = _posterCache.get(movieId);
+  let rec = _posterCache.get(key);
   if (rec) return rec;
 
   const img = new Image();
   rec = { img, ready: false, triedJpg: false };
-  _posterCache.set(movieId, rec);
+  _posterCache.set(key, rec);
 
   img.onload = () => {
     rec.ready = true;
   };
 
   img.onerror = () => {
+    // Remote TMDB poster: no local fallback needed.
+    if (remoteUrl) return;
     if (!rec.triedJpg) {
       rec.triedJpg = true;
       img.src = `frontend/assets/posters/${movieId}.jpg`;
@@ -33,7 +38,7 @@ function _getPosterImage(movieId) {
     }
   };
 
-  img.src = `frontend/assets/posters/${movieId}.png`;
+  img.src = remoteUrl || `frontend/assets/posters/${movieId}.png`;
   return rec;
 }
 
@@ -218,8 +223,7 @@ export function renderBattleCharacterSlots(ctx, opts) {
     ctx.strokeRect(posterX, posterY, POSTER_W, POSTER_H);
 
     // Poster (no border)
-    const movieId = member.movie?.id;
-    const rec = _getPosterImage(movieId);
+    const rec = _getPosterImage(member.movie);
 
     if (rec && rec.ready) {
       ctx.drawImage(rec.img, posterX, posterY, POSTER_W, POSTER_H);

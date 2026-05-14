@@ -79,6 +79,7 @@ function defaultStats() {
     wins: 0,
     losses: 0,
     campaignCleared: false,
+    campaignCompletions: 0,
 
     randomizeClicks: 0,
 
@@ -98,13 +99,17 @@ function normalizeStats(raw) {
   if (!raw || typeof raw !== "object") return base;
 
   // Copy numeric stats safely
-  const numericKeys = ["wins", "losses", "randomizeClicks", "mealsCooked", "artHouseWins"];
+  const numericKeys = ["wins", "losses", "campaignCompletions", "randomizeClicks", "mealsCooked", "artHouseWins"];
   for (const k of numericKeys) {
     base[k] = toFiniteNumber(raw[k], base[k]);
   }
 
   // Copy booleans safely
   base.campaignCleared = !!raw.campaignCleared;
+  if (base.campaignCompletions <= 0 && base.campaignCleared) {
+    // Back-compat for older saves that only had a boolean "campaignCleared".
+    base.campaignCompletions = 1;
+  }
 
   // ✅ Copy bucket maps safely
   base.winsByGenre = toCountMap(raw.winsByGenre);
@@ -220,6 +225,13 @@ export function incLosses(GameState, amount = 1) {
 
 export function incRandomizeClicks(GameState, amount = 1) {
   return incStat(GameState, "randomizeClicks", amount);
+}
+
+export function getCampaignMaxLevel(GameState) {
+  ensureStatsState(GameState);
+  const clears = Math.max(0, Math.floor(toFiniteNumber(GameState?.stats?.campaignCompletions, 0)));
+  // Level 16 is a one-time boss run: only on the run after 3 clears (your 4th completion attempt).
+  return clears === 3 ? 16 : 15;
 }
 
 // ------------------------------------------------------------

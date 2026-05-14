@@ -10,6 +10,36 @@ function norm(s) {
     .trim();
 }
 
+function normalizeCatalogGenreName(name) {
+  const s = String(name || "").trim().toLowerCase();
+  if (!s) return null;
+  const map = {
+    action: "ACTION",
+    adventure: "ADVENTURE",
+    animation: "ANIMATION",
+    comedy: "COMEDY",
+    crime: "CRIME",
+    documentary: "DRAMA",
+    drama: "DRAMA",
+    family: "FANTASY",
+    fantasy: "FANTASY",
+    history: "DRAMA",
+    horror: "HORROR",
+    music: "MUSICAL",
+    musical: "MUSICAL",
+    mystery: "MYSTERY",
+    romance: "ROMANCE",
+    "science fiction": "SCIFI",
+    "sci-fi": "SCIFI",
+    thriller: "THRILLER",
+    war: "ACTION",
+    western: "ADVENTURE",
+    tv: "DRAMA",
+    "tv movie": "DRAMA"
+  };
+  return map[s] || null;
+}
+
 function yearFromAny(movieLike) {
   const y =
     movieLike?.year ??
@@ -18,6 +48,37 @@ function yearFromAny(movieLike) {
     movieLike?.date?.slice?.(0, 4);
   const yn = Number(y);
   return Number.isFinite(yn) && yn > 1800 ? yn : null;
+}
+
+async function fetchDetailsForProviderId(providerId, fetchImpl) {
+  const pid = Number(providerId);
+  if (!Number.isFinite(pid)) return null;
+  const detailsPath = `/api/catalog/details?providerId=${encodeURIComponent(String(pid))}`;
+  const host = (typeof window !== "undefined" && window?.location?.hostname)
+    ? String(window.location.hostname)
+    : "localhost";
+  const port = (typeof window !== "undefined" && window?.location?.port)
+    ? String(window.location.port)
+    : "";
+  const useSameOriginApi = !(port === "5500");
+  const urls = [
+    ...(useSameOriginApi ? [detailsPath] : []),
+    `http://localhost:8787${detailsPath}`,
+    `http://127.0.0.1:8787${detailsPath}`,
+    `http://${host}:8787${detailsPath}`
+  ];
+
+  for (const url of urls) {
+    try {
+      const res = await fetchImpl(url, { method: "GET" });
+      if (!res?.ok) continue;
+      const data = await res.json().catch(() => null);
+      if (data && typeof data === "object") return data;
+    } catch {
+      // continue
+    }
+  }
+  return null;
 }
 
 function buildLocalIndex(baseVisible) {
@@ -48,6 +109,15 @@ function resolveLocalMatch(tmdbResult, localIndex) {
   return candidates[0];
 }
 
+function normalizeTmdbMovieId(rawId, fallbackProviderId, fallbackTitle) {
+  const rid = String(rawId || "").trim();
+  if (rid.startsWith("tmdb_")) return rid;
+  if (rid) return `tmdb_${rid}`;
+  const pid = Number(fallbackProviderId);
+  if (Number.isFinite(pid)) return `tmdb_${pid}`;
+  return `tmdb_${norm(fallbackTitle || "unknown")}`;
+}
+
 export function createTmdbSearchProvider({
   getApiKey,
   fetchImpl = (...args) => fetch(...args),
@@ -58,25 +128,54 @@ export function createTmdbSearchProvider({
     async search({ query, baseVisible, limit = 6 }) {
       const q = String(query || "").trim();
       if (!q || q.length < minQueryLength) return [];
-      if (!Array.isArray(baseVisible) || !baseVisible.length) return [];
+      if (!Array.isArray(baseVisible)) baseVisible = [];
 
-      const apiKey = typeof getApiKey === "function" ? String(getApiKey() || "").trim() : "";
-      if (!apiKey) return [];
+      const searchPath = `/api/catalog/search?query=${encodeURIComponent(q)}&page=1`;
+      const host = (typeof window !== "undefined" && window?.location?.hostname)
+        ? String(window.location.hostname)
+        : "localhost";
+      const port = (typeof window !== "undefined" && window?.location?.port)
+        ? String(window.location.port)
+        : "";
+      const useSameOriginApi = !(port === "5500");
+      const urls = [
+        // Preferred: same-origin proxy when available.
+        ...(useSameOriginApi ? [searchPath] : []),
+        // Fallbacks: direct local catalog server for setups without a dev proxy.
+        `http://localhost:8787${searchPath}`,
+        `http://127.0.0.1:8787${searchPath}`,
+        `http://${host}:8787${searchPath}`
+      ];
 
-      const url =
-        `https://api.themoviedb.org/3/search/movie?api_key=${encodeURIComponent(apiKey)}` +
-        `&query=${encodeURIComponent(q)}&include_adult=false&page=1`;
-
-      const res = await fetchImpl(url, { method: "GET" });
-      if (!res?.ok) return [];
+      let res = null;
+      for (const url of urls) {
+        try {
+          const candidate = await fetchImpl(url, { method: "GET" });
+          if (candidate?.ok) {
+            res = candidate;
+            break;
+          }
+        } catch {
+          // try next URL
+        }
+      }
+      if (!res?.ok) {
+        try {
+          console.warn("[expanded-search] catalog backend unreachable", { mode: "expanded", query: q });
+        } catch {}
+        return [];
+      }
 
       const data = await res.json().catch(() => null);
-      const results = Array.isArray(data?.results) ? data.results : [];
+      const results = Array.isArray(data?.results)
+        ? data.results
+        : (Array.isArray(data?.items) ? data.items : []);
       if (!results.length) return [];
 
       const localIndex = buildLocalIndex(baseVisible);
       const out = [];
       const seen = new Set();
+      const detailCache = new Map();
 
       for (const r of results) {
         const match = resolveLocalMatch(r, localIndex);
@@ -91,14 +190,61 @@ export function createTmdbSearchProvider({
         if (seen.has(dedupeKey)) continue;
         seen.add(dedupeKey);
 
+        const providerId = Number.isFinite(Number(r?.id))
+          ? Number(r.id)
+          : (Number.isFinite(Number(r?.providerId)) ? Number(r.providerId) : null);
+
+        const hasGenrePair = !!String(r?.primaryGenre || "").trim() || !!String(r?.secondaryGenre || "").trim();
+        const hasRuntime = Number.isFinite(Number(r?.runtime));
+        const hasRating = Number.isFinite(Number(r?.imdb)) || Number.isFinite(Number(r?.rating)) || Number.isFinite(Number(r?.vote_average));
+        let details = null;
+        if ((!hasGenrePair || !hasRuntime || !hasRating) && providerId != null) {
+          if (detailCache.has(providerId)) details = detailCache.get(providerId);
+          else {
+            details = await fetchDetailsForProviderId(providerId, fetchImpl);
+            detailCache.set(providerId, details);
+          }
+        }
+
+        const rawGenres = Array.isArray(details?.genres)
+          ? details.genres
+          : (Array.isArray(r?.genres) ? r.genres : []);
+        const normGenres = Array.from(
+          new Set(rawGenres.map((g) => normalizeCatalogGenreName(g)).filter(Boolean))
+        );
+
         out.push({
           source: "tmdb",
           baseIndex,
-          tmdbId: Number.isFinite(Number(r?.id)) ? Number(r.id) : null,
+          tmdbId: providerId,
           movie: match?.movie || {
-            id: `tmdb_${String(r?.id || "").trim() || norm(r?.title || r?.name || "")}`,
+            id: normalizeTmdbMovieId(r?.id, r?.providerId, r?.title || r?.name || ""),
             title: String(r?.title || r?.name || "Unknown"),
-            release_date: String(r?.release_date || "")
+            shortTitle: String(r?.title || r?.name || "Unknown"),
+            release_date: String(details?.release_date || r?.release_date || ""),
+            year: yearFromAny(details || r),
+            runtime: Number.isFinite(Number(details?.runtime))
+              ? Number(details.runtime)
+              : (Number.isFinite(Number(r?.runtime)) ? Number(r.runtime) : null),
+            imdb: Number.isFinite(Number(details?.imdb))
+              ? Number(details.imdb)
+              : (Number.isFinite(Number(details?.rating))
+                ? Number(details.rating)
+                : (Number.isFinite(Number(r?.imdb))
+                  ? Number(r.imdb)
+                  : (Number.isFinite(Number(r?.rating))
+                    ? Number(r.rating)
+                    : (Number.isFinite(Number(r?.vote_average)) ? Number(r.vote_average) : null)))),
+            genres: rawGenres.slice(0, 8).map((g) => String(g)),
+            primaryGenre: String(
+              details?.primaryGenre || r?.primaryGenre || normGenres[0] || ""
+            ).toUpperCase() || null,
+            secondaryGenre: String(
+              details?.secondaryGenre || r?.secondaryGenre || normGenres[1] || ""
+            ).toUpperCase() || null,
+            posterUrl: String(details?.posterUrl || r?.posterUrl || ""),
+            provider: "tmdb",
+            providerId
           }
         });
 
@@ -109,4 +255,3 @@ export function createTmdbSearchProvider({
     }
   };
 }
-

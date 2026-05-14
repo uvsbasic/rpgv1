@@ -13,7 +13,7 @@
 //
 // Keeps your existing return shapes, but adds absorbedShield for debugging.
 
-export const PLAYER_ATK_MULT = 1.8;
+export const PLAYER_ATK_MULT = 2.5;
 const ENEMY_ATK_MULT = 1.2;
 const ENEMY_DEF_MULT = 1;
 

@@ -103,6 +103,14 @@ const PRESETS = [
   {
     name: "Leo",
     titles: ["This is Spinal Tap", "Office Space", "Howls Moving Castle", "Purple Rain"]
+  },
+  {
+    name: "XA",
+    titles: ["Purple Rain", "Office Space", "Steve Jobs", "Harry Potter and the Sorcerer's Stone"]
+  },
+  {
+    name: "Oz",
+    titles: ["The Wizard of Oz (1939)", "Wicked", "Wicked: For Good", "The Wiz"]
   }
 ];
 

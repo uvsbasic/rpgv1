@@ -20,6 +20,7 @@ import { changeScreen } from "../game.js";
 import { SCREEN } from "../layout.js";
 import { GameState } from "../core/GameState.js";
 import { resetAllConfirmPending } from "../systems/transientUiReset.js";
+import { Input } from "../ui.js";
 
 
 import { syncSavedAudioIfReady } from "../systems/screenAudioSync.js";
@@ -40,34 +41,9 @@ let delayMsLeft = 0;
 // dt fallback
 let lastNow = 0;
 
-// DOM listeners so "ANY key" truly means any key
-let bound = false;
-let onAnyKeyDown = null;
-let onAnyPointerDown = null;
-
 // ✅ Blink freeze state (stops flashing after input)
 let tapeBlinkFrozen = false;
 let tapeBlinkState = true;
-
-function cleanupListeners() {
-  if (!bound) return;
-  bound = false;
-
-  try {
-    window.removeEventListener("keydown", onAnyKeyDown, true);
-    window.removeEventListener("pointerdown", onAnyPointerDown, true);
-  } catch {}
-
-  onAnyKeyDown = null;
-  onAnyPointerDown = null;
-}
-
-function swallowEvent(e) {
-  // Best-effort to prevent this gesture from leaking into the next screen.
-  try { e.preventDefault?.(); } catch {}
-  try { e.stopPropagation?.(); } catch {}
-  try { e.stopImmediatePropagation?.(); } catch {}
-}
 
 function beginTransition() {
   if (phase !== "idle") return;
@@ -86,8 +62,6 @@ function beginTransition() {
   phase = "delay";
   delayMsLeft = TRANSITION_DELAY_MS;
 
-  // stop listening so we don't re-trigger
-  cleanupListeners();
 }
 
 function normalizeDtToMs(dt) {
@@ -149,11 +123,6 @@ function wrapTextLines(ctx, text, maxWidthPx) {
   return lines;
 }
 
-function isFunctionKey(k) {
-  // Matches "F1".."F24" (covers all common function keys)
-  return typeof k === "string" && /^F([1-9]|1[0-9]|2[0-4])$/.test(k);
-}
-
 export const BootScreen = {
   enter() {
     tSec = 0;
@@ -191,37 +160,16 @@ export const BootScreen = {
 
     lastNow = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
 
-    if (!bound) {
-      bound = true;
-
-      onAnyKeyDown = (e) => {
-        if (e?.repeat) return;
-
-        const k = e?.key;
-
-        // ✅ Ignore function keys on this screen
-        if (isFunctionKey(k)) return;
-
-        swallowEvent(e);
-        beginTransition();
-      };
-
-      onAnyPointerDown = (e) => {
-        swallowEvent(e);
-        beginTransition();
-      };
-
-      window.addEventListener("keydown", onAnyKeyDown, true);
-      window.addEventListener("pointerdown", onAnyPointerDown, true);
-    }
   },
 
-  update(dt, mouse) {
-    const dtMs = normalizeDtToMs(dt);
+  update(mouse) {
+    const dtMs = normalizeDtToMs();
     tSec += dtMs / 1000;
 
     if (phase === "idle") {
-      if (mouse?.clicked || mouse?.down) beginTransition();
+      const keyPressed = !!Input.wasAnyKeyPressedThisFrame({ ignoreFunctionKeys: true });
+      const pointerPressed = !!(mouse?.pressed || mouse?.clicked || mouse?.tapped);
+      if (keyPressed || pointerPressed) beginTransition();
       return;
     }
 

@@ -124,7 +124,13 @@ export const enemies = [
     intro:["A new challenger appears."], defeat:["The enemy is knocked down."],
     maxHP:350, attack:52, defense:12, bgTheme: "Internet",
     prone: 1, moves: 5,
+  },
+  {
+    id:"film_professor", name:"My Film Professor", description:"That was certainly a choice...",
+    intro:["You're old film professor walks in..."], defeat:["The enemy has backed down!"],
+    maxHP:500, attack:45, defense:24, bgTheme: "Coding",
+    prone: 1, moves: 3,
+    moveIds: ["basic_attack", "choice"],
   }
 ];
-
 

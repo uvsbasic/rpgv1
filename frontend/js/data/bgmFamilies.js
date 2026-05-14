@@ -10,7 +10,9 @@ export const BGM_BY_FAMILY = {
   Art: ["frontend/assets/audio/bgm/Art_01.ogg"],
   Cinephile: ["frontend/assets/audio/bgm/Art_01.ogg"],
   Disney: ["frontend/assets/audio/bgm/Disney_01.ogg"],
-  Secret: ["frontend/assets/audio/bgm/Straight_Loop.ogg"]
+  Secret: ["frontend/assets/audio/bgm/Straight_Loop.ogg"],
+  // Placeholder coding family until dedicated tracks are added.
+  Coding: ["frontend/assets/audio/bgm/Straight_Loop.ogg"]
 
   // New style example:
   // Snob: [

@@ -312,6 +312,7 @@ export function createBattleActions({ state, deps }) {
     executePerkSpecial,
     onRecordAction,
     onXpEvent,
+    onActionResolved,
     isConfirmHeld,
     beforeHealTarget,
     beforeShieldTarget,
@@ -322,6 +323,11 @@ export function createBattleActions({ state, deps }) {
     
     DEFEND_ENEMY_PHASES = 2
   } = deps;
+
+  function emitActionResolved(payload) {
+    if (typeof onActionResolved !== "function") return;
+    onActionResolved(payload || {});
+  }
 
   if (!Array.isArray(actions) || actions.length === 0) {
     throw new Error("createBattleActions requires deps.actions (non-empty array)");
@@ -456,6 +462,15 @@ export function createBattleActions({ state, deps }) {
             actor,
             effectiveDamage: finalDamage,
             isCrit: !!action.result?.isCrit
+          });
+          emitActionResolved({
+            phase: "player_attack",
+            kind: "attack",
+            actor,
+            target: state.enemy,
+            damage: finalDamage,
+            isCrit: !!action.result?.isCrit,
+            party: state.party
           });
           if (typeof onRecordAction === "function") {
             onRecordAction(actor, "ATTACK", "Basic Attack");
@@ -1052,6 +1067,14 @@ export function createBattleActions({ state, deps }) {
             damageDealt: Number(result.damageDealt || 0),
             effects: result.effects || {}
           });
+          emitActionResolved({
+            phase: "player_attack",
+            kind: "item",
+            actor,
+            target,
+            damage: Number(result.damageDealt || 0),
+            party: state.party
+          });
           if (typeof onRecordAction === "function") {
             onRecordAction(actor, "ITEM", result.itemName);
           }
@@ -1213,6 +1236,14 @@ export function createBattleActions({ state, deps }) {
             actor,
             special: sp,
             effects: action.result?.effects || null
+          });
+          emitActionResolved({
+            phase: "player_attack",
+            kind: "special",
+            actor,
+            target: state.enemy,
+            damage: Number(action.result?.effects?.damageDealt || action.result?.effects?.dmg || 0),
+            party: state.party
           });
 
           if (typeof onRecordAction === "function") {
@@ -1401,6 +1432,14 @@ export function createBattleActions({ state, deps }) {
             special: sp,
             effects: action.result?.effects || null
           });
+          emitActionResolved({
+            phase: "player_attack",
+            kind: "special",
+            actor,
+            target: state.enemy,
+            damage: Number(action.result?.effects?.damageDealt || action.result?.effects?.dmg || 0),
+            party: state.party
+          });
           if (typeof onRecordAction === "function") {
             onRecordAction(actor, "SPECIAL", sp?.name || sp?.label || sp?.id || "Unknown Special");
           }
@@ -1480,6 +1519,58 @@ export function createBattleActions({ state, deps }) {
     else if (action === "SPECIAL") playerOpenSpecialMenu();
   }
 
+  function triggerAutoWinFatalBlow() {
+    if (!state.enemy || Number(state.enemy.hp || 0) <= 0) return false;
+
+    state.enemy.hp = 0;
+    state.phase = "victory";
+    state.uiMode = "command";
+    state.confirmAction = null;
+    state.actionIndex = 0;
+
+    const actor = getCurrentActor();
+    if (typeof onRecordAction === "function") {
+      onRecordAction(actor || state.enemy, "ATTACK", "Fatal Blow (Auto Win)");
+    }
+
+    const xpSummary = typeof awardXpToParty === "function"
+      ? awardXpToParty(state.party, state.enemy)
+      : null;
+    if (typeof onPrepareLevelUpRoll === "function") onPrepareLevelUpRoll(xpSummary);
+    if (typeof syncPartyProgressToGameState === "function") syncPartyProgressToGameState();
+
+    const levelLines = buildLevelUpLinesFromSummary(
+      state.party,
+      xpSummary,
+      onLevelUpRollTrigger
+    );
+
+    const enemyName = String(state.enemy?.name || "The enemy");
+    const fatalBlowLine = [{ text: `Fatal Blow! ${enemyName} is instantly defeated.` }];
+    const enemyDownLines = wrapLinesWithEnterReleaseArm(
+      buildEnemyKnockdownLines(state.enemy, buildEnemyDefeatedLine),
+      onVictoryEnemyDownLineStart,
+      "all"
+    );
+    const postEnemyDownLines = [
+      ...levelLines,
+      ...wrapLinesWithEnterReleaseArm([buildPressEnterContinueBangLine()], onVictoryEnemyDownLineStart, "all")
+    ];
+    const postEnemyDownWithSettle = attachOnStartToFirstLine(postEnemyDownLines, () => {
+      if (typeof settleMortalPartySlotsAtDisplayedHp === "function") {
+        settleMortalPartySlotsAtDisplayedHp();
+      }
+    });
+
+    queueMessages(fatalBlowLine, () => {
+      queueMessages(enemyDownLines, () => {
+        queueMessages(postEnemyDownWithSettle, () => {});
+      });
+    });
+
+    return true;
+  }
+
   return {
     beginConfirm,
     runConfirmedAction,
@@ -1494,7 +1585,8 @@ export function createBattleActions({ state, deps }) {
 
     playerOpenSpecialMenu,
     confirmUseSelectedSpecial,
-    confirmUseSpecialOnTarget
+    confirmUseSpecialOnTarget,
+    triggerAutoWinFatalBlow
   };
 }
 

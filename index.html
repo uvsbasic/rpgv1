@@ -63,6 +63,7 @@
     function loop() {
       update(mouse);
       render(ctx);
+      Input.endFrame();
       // Reset one-frame pointer flags AFTER the frame has used them.
       mouse.endFrame();
       requestAnimationFrame(loop);

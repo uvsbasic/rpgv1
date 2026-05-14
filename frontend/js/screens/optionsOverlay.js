@@ -223,6 +223,7 @@ export function createOptionsOverlay({
   // callbacks
   onClose = null,
   onReset = null,
+  onReportBug = null,
   onSetMusicGain = null, // 0..1
   onSetSfxGain = null, // 0..1
   getBattleInfoLines = null,
@@ -288,7 +289,8 @@ export function createOptionsOverlay({
     const base = [
       { type: "action", id: "continue", label: "Continue" },
       { type: "slider", id: "music", label: "Music" },
-      { type: "slider", id: "sfx", label: "SFX" }
+      { type: "slider", id: "sfx", label: "SFX" },
+      { type: "action", id: "reportBug", label: "Report Bug" }
     ];
     if (state.context === "menu") base.push({ type: "action", id: "reset", label: "Reset" });
     return base;
@@ -465,6 +467,11 @@ export function createOptionsOverlay({
         close();
         return;
       }
+      if (hoveredHit.id === "reportBug") {
+        if (state.context === "menu" && typeof onReportBug === "function") onReportBug();
+        close();
+        return;
+      }
       if (hoveredHit.id === "reset") {
         if (state.context === "menu" && typeof onReset === "function") onReset();
         close();
@@ -496,6 +503,11 @@ export function createOptionsOverlay({
 
       if (hovered.type === "action") {
         if (hovered.id === "continue") {
+          close();
+          return;
+        }
+        if (hovered.id === "reportBug") {
+          if (state.context === "menu" && typeof onReportBug === "function") onReportBug();
           close();
           return;
         }

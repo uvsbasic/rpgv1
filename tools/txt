@@ -1,0 +1,54 @@
+
+const OVERRIDES = {
+  // ✅ EXACT posters (direct URLs you chose)
+  rear_window: {
+    tmdbId: 567, // Rear Window (1954)
+  },
+
+  harry_potter_2001: {
+    tmdbId: 671, // Harry Potter and the Philosopher's Stone (2001)
+  },
+
+  love_and_mercy: {
+    tmdbId: 271714, // Love & Mercy (2014)
+  },
+
+  steve_jobs_2015: {
+    tmdbId: 321697, // Steve Jobs (2015)
+  },
+  dune_1984: {
+    tmdbId: 841, // Dune (1984)
+  },
+  mystery_train: {
+    tmdbId: 11305, // Mystery Train (1989)
+  },
+  wings_of_desire: {
+    tmdbId: 144, // Wings of Desire (1987)
+  },
+  mandy_2018: {
+    tmdbId: 460885, // Mandy (2018)
+  },
+  howls_moving_castle: {
+    directPosterUrl: "https://image.tmdb.org/t/p/original/jVuYH2SS9GfJhmW40spJ03mZ15l.jpg",
+  },
+  raging_bull: {
+    directPosterUrl: "https://image.tmdb.org/t/p/original/wpfpnVUVy6kElwz1Z6p5QiCpbwB.jpg",
+  },
+  ten_things_i_hate_about_you: {
+    directPosterUrl: "https://image.tmdb.org/t/p/original/u3jyD55Tdbj4hCgDhvRyOK9nFsH.jpg",
+  },
+  this_is_spinal_tap: {
+  directPosterUrl: "https://image.tmdb.org/t/p/original/lTdoAGlVvIn3W1ZVa8iX4Sh2SCq.jpg",
+},
+  rushmore: {
+    directPosterUrl: "https://image.tmdb.org/t/p/original/5BpHFugpgiNg68FXSqc4EJRfOuE.jpg",
+  },
+  eight_half: {
+    directPosterUrl: "https://image.tmdb.org/t/p/original/xmdsHc9f2vOsKYh2zTOaI5k4quj.jpg",
+  },
+
+  // ✅ Parasite by TMDB ID (you provided)
+  parasite: {
+    tmdbId: 496243,
+  },
+};

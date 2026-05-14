@@ -114,3 +114,72 @@ export const midrunKits = [
     ]
   }
 ];
+
+export const eggKits = [
+  {
+    id: "kids_egg",
+    name: "The SUPER Kids Meal",
+    items: [
+      { id: "soda_launcher", count: 1 },
+      { id: "small_popcorn", count: 40 },
+      { id: "small_chips", count: 40 },
+      { id: "fun_candy", count: 40 },
+      { id: "jumbo_candy", count: 20 }
+    ]
+  },
+  {
+    id: "midnight_egg",
+    name: "The Midnight Run",
+    items: [
+      { id: "jumbo_cannon", count: 1 },
+      { id: "large_chips", count: 50 },
+      { id: "jumbo_candy", count: 25 },
+      { id: "blue_slush", count: 25 },
+      { id: "purple_slush", count: 10 }
+    ]
+  },
+  {
+    id: "soda_egg",
+    name: "The Soda Freestyle",
+    items: [
+      { id: "soda_launcher", count: 1 },
+      { id: "large_soda", count: 50 },
+      { id: "red_slush", count: 30 },
+      { id: "green_slush", count: 30 },
+      { id: "purple_slush", count: 7 }
+    ]
+  },
+  {
+    id: "marathon_egg",
+    name: "The Marathon Special",
+    items: [
+      { id: "jumbo_cannon", count: 1 },
+      { id: "large_soda", count: 45 },
+      { id: "large_chips", count: 30 },
+      { id: "green_slush", count: 20 },
+      { id: "bottom_popcorn", count: 10 },
+    ]
+  },
+  {
+    id: "popcorn_egg",
+    name: "Popcorn Addict",
+    items: [
+      { id: "projector_3d", count: 1 },
+      { id: "stale_popcorn", count: 30 },
+      { id: "butter_popcorn", count: 30 },
+      { id: "caramel_popcorn", count: 30 },
+      { id: "bottom_popcorn", count: 20 }
+    ]
+  },
+  {
+    id: "imax_egg",
+    name: "The IMAX Experience",
+    items: [
+      { id: "projector_3d", count: 1 },
+      { id: "pretzel_bites", count: 50 },
+      { id: "nacho_bomb", count: 30 },
+      { id: "bottom_popcorn", count: 30 },
+      { id: "purple_slush", count: 10 }
+    ]
+  },
+];

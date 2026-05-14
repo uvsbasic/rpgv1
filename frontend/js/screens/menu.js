@@ -279,6 +279,9 @@ function ensureOptionsOverlay() {
     onReset: () => {
       doFullResetFlow();
     },
+    onReportBug: () => {
+      changeScreen("reportbugs");
+    },
 
     onSetMusicGain: (g01) => {
       try { setBgmVolume(g01); } catch {}

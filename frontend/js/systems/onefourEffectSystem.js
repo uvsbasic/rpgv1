@@ -46,12 +46,28 @@ function getMovieTitle(movie) {
 
 function getPrimaryGenre(movie) {
   const id = getMovieId(movie);
-  return id ? (movieMeta?.[id]?.primaryGenre || null) : null;
+  const fromMeta = id ? (movieMeta?.[id]?.primaryGenre || null) : null;
+  if (fromMeta) return fromMeta;
+  const direct = String(movie?.primaryGenre || "").trim().toUpperCase();
+  if (direct) return direct;
+  if (Array.isArray(movie?.genres) && movie.genres.length) {
+    const first = String(movie.genres[0] || "").trim().toUpperCase();
+    if (first) return first;
+  }
+  return direct || null;
 }
 
 function getSecondaryGenre(movie) {
   const id = getMovieId(movie);
-  return id ? (movieMeta?.[id]?.secondaryGenre || null) : null;
+  const fromMeta = id ? (movieMeta?.[id]?.secondaryGenre || null) : null;
+  if (fromMeta) return fromMeta;
+  const direct = String(movie?.secondaryGenre || "").trim().toUpperCase();
+  if (direct) return direct;
+  if (Array.isArray(movie?.genres) && movie.genres.length > 1) {
+    const second = String(movie.genres[1] || "").trim().toUpperCase();
+    if (second) return second;
+  }
+  return null;
 }
 
 function normalizeGenre(g) {
@@ -407,8 +423,11 @@ function buildBonusBundleForGenreTier(genreKey, tier) {
 }
 
 export function computeFirstPickEffect(movie, headlineText = "") {
-  const primary = normalizeGenre(getPrimaryGenre(movie));
-  const secondary = normalizeGenre(getSecondaryGenre(movie));
+  const primaryRaw = getPrimaryGenre(movie);
+  const secondaryRaw = getSecondaryGenre(movie);
+  const primary = normalizeGenre(primaryRaw);
+  const secondary = secondaryRaw ? normalizeGenre(secondaryRaw) : "";
+  const secondaryForEffects = secondary || "UNKNOWN";
 
   // First pick uses:
   // - SELF uses MAIN of primary
@@ -417,7 +436,7 @@ export function computeFirstPickEffect(movie, headlineText = "") {
   const teamTier = "TEAM";
 
   const selfBundle = buildBonusBundleForGenreTier(primary, selfTier);
-  const teamBundle = buildBonusBundleForGenreTier(secondary, teamTier);
+  const teamBundle = buildBonusBundleForGenreTier(secondaryForEffects, teamTier);
 
   // Pull display-friendly non-stat details from the bundles
   // (This avoids depending on GENRE_EFFECTS directly and stays consistent with bundle logic.)
@@ -429,7 +448,7 @@ export function computeFirstPickEffect(movie, headlineText = "") {
     movieId: getMovieId(movie),
     title: getMovieTitle(movie),
     primaryGenre: primary,
-    secondaryGenre: secondary,
+    secondaryGenre: secondary || null,
 
     selfTier,
     teamTier,
@@ -451,8 +470,12 @@ export function computeFirstPickEffect(movie, headlineText = "") {
 }
 
 export function computeFourthPickEffect(movie, headlineText = "") {
-  const primary = normalizeGenre(getPrimaryGenre(movie));
-  const secondary = normalizeGenre(getSecondaryGenre(movie));
+  const primaryRaw = getPrimaryGenre(movie);
+  const secondaryRaw = getSecondaryGenre(movie);
+  const primary = normalizeGenre(primaryRaw);
+  const secondary = secondaryRaw ? normalizeGenre(secondaryRaw) : "";
+  const hasSecondary = !!secondary;
+  const secondaryForEffects = secondary || "UNKNOWN";
 
   const imdb = getImdbScore(movie);
   const sf = imdbScale(imdb); // ✅ NO CAP
@@ -460,11 +483,11 @@ export function computeFourthPickEffect(movie, headlineText = "") {
   const tier = "FOUR";
 
   const aBundle = buildBonusBundleForGenreTier(primary, tier);
-  const bBundle = buildBonusBundleForGenreTier(secondary, tier);
+  const bBundle = hasSecondary ? buildBonusBundleForGenreTier(secondaryForEffects, tier) : null;
 
   // Stat mods for 4th pick are FOUR tier and IMDb scaled
   const teamModsStatA = scaleMods(aBundle.stat || {}, sf);
-  const teamModsStatB = scaleMods(bBundle.stat || {}, sf);
+  const teamModsStatB = hasSecondary ? scaleMods(bBundle?.stat || {}, sf) : null;
 
   // Also scale non-stat bundles that are magnitude-based / chance-based
   // We only scale the numeric fields, preserving rules.
@@ -494,18 +517,18 @@ export function computeFourthPickEffect(movie, headlineText = "") {
   }
 
   const scaledA = scaleBundle(aBundle);
-  const scaledB = scaleBundle(bBundle);
+  const scaledB = hasSecondary ? scaleBundle(bBundle) : null;
 
   // NEW: pull display non-stat from the SCALED bundles so UI matches gameplay
   const teamNonStatA = extractNonStatForDisplay(scaledA);
-  const teamNonStatB = extractNonStatForDisplay(scaledB);
+  const teamNonStatB = hasSecondary ? extractNonStatForDisplay(scaledB) : null;
 
   return {
     kind: "fourth",
     movieId: getMovieId(movie),
     title: getMovieTitle(movie),
     primaryGenre: primary,
-    secondaryGenre: secondary,
+    secondaryGenre: secondary || null,
 
     imdb,
     scaleFactor: sf,
@@ -618,7 +641,7 @@ export function applyOneFourEffectsToParty(GameState, partyActors) {
   if (fourth) {
     for (const a of partyActors) {
       applyStatModsToActor(a, fourth.teamModsStatA);
-      applyStatModsToActor(a, fourth.teamModsStatB);
+      if (fourth.teamModsStatB) applyStatModsToActor(a, fourth.teamModsStatB);
     }
   }
 
@@ -763,7 +786,7 @@ export function getOneFourBonusBundle(GameState) {
 
   // Fourth pick contributes:
   absorbBundle(fourth?.bundleTeamA);
-  absorbBundle(fourth?.bundleTeamB);
+  if (fourth?.bundleTeamB) absorbBundle(fourth.bundleTeamB);
 
   return {
     // additive magnitudes

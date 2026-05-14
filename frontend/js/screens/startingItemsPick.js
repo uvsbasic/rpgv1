@@ -3,7 +3,7 @@
 import { GameState, changeScreen } from "../game.js";
 import { Input } from "../ui.js";
 import { SCREEN } from "../layout.js";
-import { openingKits } from "../data/starterKits.js";
+import { openingKits, eggKits } from "../data/starterKits.js";
 import { items } from "../data/items.js";
 import { playUIConfirmBlip, playUIBackBlip, playUIMoveBlip } from "../sfx/uiSfx.js";
 
@@ -68,6 +68,23 @@ const KIT_SHORT_DESCRIPTIONS = {
   theater_floor_combo: "What? Five second rule dude."
 };
 
+const EGG_KIT_SHORT_DESCRIPTIONS = {
+  kids_egg: "What'd you expect, a toy??",
+  midnight_egg: "Don't forget the expired hot dogs!",
+  soda_egg: "Just say the soda machine.",
+  marathon_egg: "Enough to last you a lifetime!",
+  popcorn_egg: "That'll be $110.38!",
+  imax_egg: "Experience it in IMAX."
+};
+
+function isEggBattleFlow() {
+  return String(GameState?.specialFlow?.type || "") === "eggBattle";
+}
+
+function getActiveKitPool() {
+  return isEggBattleFlow() ? eggKits : openingKits;
+}
+
 function ensureCampaignBuckets() {
   if (!GameState.campaign) {
     GameState.campaign = {
@@ -128,8 +145,49 @@ function pickWeightedKit(pool) {
 
 function sampleOpeningKitIds(count) {
   const wanted = Math.max(0, Math.floor(Number(count || 0)));
-  const pool = Array.isArray(openingKits)
-    ? openingKits.filter((k) => String(k?.id || ""))
+  const sourcePool = getActiveKitPool();
+  const eggFlow = isEggBattleFlow();
+
+  if (eggFlow) {
+    // Egg battle requirement: always offer one kit for each weapon lane.
+    // - projector_3d
+    // - jumbo_cannon
+    // - soda_launcher
+    const requiredWeapons = ["projector_3d", "jumbo_cannon", "soda_launcher"];
+    const picked = [];
+    const usedIds = new Set();
+
+    for (const weaponId of requiredWeapons) {
+      const candidates = sourcePool.filter((kit) => {
+        if (!kit || usedIds.has(String(kit.id || ""))) return false;
+        const entries = Array.isArray(kit.items) ? kit.items : [];
+        return entries.some((e) => String(e?.id || "") === weaponId);
+      });
+      if (candidates.length <= 0) continue;
+      const choice = candidates[Math.floor(Math.random() * candidates.length)];
+      const id = String(choice?.id || "");
+      if (!id) continue;
+      picked.push(id);
+      usedIds.add(id);
+      if (picked.length >= wanted) break;
+    }
+
+    if (picked.length < wanted) {
+      const fallback = sourcePool
+        .map((k) => String(k?.id || ""))
+        .filter((id) => id && !usedIds.has(id));
+      while (picked.length < wanted && fallback.length > 0) {
+        const idx = Math.floor(Math.random() * fallback.length);
+        const [id] = fallback.splice(idx, 1);
+        picked.push(id);
+      }
+    }
+
+    return picked.slice(0, wanted);
+  }
+
+  const pool = Array.isArray(sourcePool)
+    ? sourcePool.filter((k) => String(k?.id || ""))
     : [];
   const picked = [];
   const usedWeaponIds = new Set();
@@ -156,12 +214,13 @@ function sampleOpeningKitIds(count) {
 }
 
 function hasValidOfferIds(ids) {
+  const sourcePool = getActiveKitPool();
   if (!Array.isArray(ids) || ids.length !== CHOICE_COUNT) return false;
   const seen = new Set();
   for (const raw of ids) {
     const id = String(raw || "");
     if (!id || seen.has(id)) return false;
-    if (!openingKits.some((k) => k?.id === id)) return false;
+    if (!sourcePool.some((k) => k?.id === id)) return false;
     seen.add(id);
   }
   return true;
@@ -169,16 +228,18 @@ function hasValidOfferIds(ids) {
 
 function ensureOpeningKitChoices() {
   ensureCampaignBuckets();
-  if (hasValidOfferIds(GameState.campaign.openingKitOfferedIds)) return;
-  GameState.campaign.openingKitOfferedIds = sampleOpeningKitIds(CHOICE_COUNT);
+  const offeredKey = isEggBattleFlow() ? "eggKitOfferedIds" : "openingKitOfferedIds";
+  if (hasValidOfferIds(GameState.campaign[offeredKey])) return;
+  GameState.campaign[offeredKey] = sampleOpeningKitIds(CHOICE_COUNT);
 }
 
 function getOfferedKits() {
   ensureOpeningKitChoices();
-  const ids = Array.isArray(GameState.campaign.openingKitOfferedIds)
-    ? GameState.campaign.openingKitOfferedIds
+  const offeredKey = isEggBattleFlow() ? "eggKitOfferedIds" : "openingKitOfferedIds";
+  const ids = Array.isArray(GameState.campaign[offeredKey])
+    ? GameState.campaign[offeredKey]
     : [];
-  const byId = new Map(openingKits.map((k) => [String(k?.id || ""), k]));
+  const byId = new Map(getActiveKitPool().map((k) => [String(k?.id || ""), k]));
   return ids.map((id) => byId.get(String(id || ""))).filter(Boolean);
 }
 
@@ -268,6 +329,9 @@ function drawWrappedLines(ctx, text, x, y, maxW, lineH, maxLines = 2) {
 
 function getKitBlurb(kit) {
   const id = String(kit?.id || "");
+  if (isEggBattleFlow()) {
+    return EGG_KIT_SHORT_DESCRIPTIONS[id] || "A curated egg-battle combo.";
+  }
   return KIT_SHORT_DESCRIPTIONS[id] || "A curated starter combo.";
 }
 
@@ -547,10 +611,14 @@ function beginReveal(kits) {
 function pickSelectedKitAndStartBattle(kits, index) {
   const kit = kits[index] || null;
   if (!kit) return;
+  const isJesseFlow = String(GameState?.specialFlow?.type || "") === "eggBattle";
   ensureCampaignBuckets();
   GameState.campaign.openingKitSelectedId = String(kit.id || "");
   playUIConfirmBlip(ITEM_SELECT_CONFIRM_BEEP);
-  changeScreen("battle");
+  if (isJesseFlow) {
+    GameState.runMode = "campaign";
+  }
+  changeScreen(isJesseFlow ? "enemyIntro" : "battle");
 }
 
 export const StartingItemsPickScreen = {
@@ -564,9 +632,13 @@ export const StartingItemsPickScreen = {
   },
 
   update(mouse) {
+    const isJesseFlow = String(GameState?.specialFlow?.type || "") === "eggBattle";
     const kits = getOfferedKits();
     if (kits.length <= 0) {
-      changeScreen("battle");
+      if (isJesseFlow) {
+        GameState.runMode = "campaign";
+      }
+      changeScreen(isJesseFlow ? "enemyIntro" : "battle");
       return;
     }
     selectedIndex = Math.max(0, Math.min(selectedIndex, kits.length - 1));
@@ -631,7 +703,7 @@ export const StartingItemsPickScreen = {
       if (uiStage === "confirmPending") {
         uiStage = "choose";
       } else {
-        changeScreen("fourthPick");
+        changeScreen(isJesseFlow ? "select" : "fourthPick");
       }
       return;
     }

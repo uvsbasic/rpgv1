@@ -13,7 +13,9 @@
 //   - click a slot -> place movie, exit mode
 
 import { movies, getAvailableMovies } from "../data/movies.js";
+import { enemies } from "../data/enemies.js";
 import { playerArchetypes } from "../data/playerArchetypes.js";
+import { calculateMovieStats } from "../combat/stats.js";
 import { GameState, changeScreen } from "../game.js";
 import { SCREEN, SELECT_LAYOUT as L } from "../layout.js";
 import { Input } from "../ui.js";
@@ -30,6 +32,10 @@ import { movieMeta } from "../data/movieMeta.js";
 
 import { renderUnlockArcOverlay } from "./unlockArcOverlay.js";
 import { peekUnlockEvents, popNextUnlockEvent } from "../systems/unlockTriggers.js";
+import { ensureMatineeState, recordCampaignRunStart } from "../data/matinee/storage.js";
+import { discoverSetsFromRoster, getActiveUnlockedSetIdsForRoster } from "../data/matinee/extraDiscovery.js";
+import { getMatineeSetArchetypes } from "../data/matinee/bonusSelectSets.js";
+import { evaluateExtraMovieUnlocks, recordExactLineupRun } from "../data/matinee/extraSystems.js";
 
 // Search (new)
 import {
@@ -42,7 +48,9 @@ import {
   closeSearchDropdown,
   renderSearchDropdown,
   enterPickSlotMode,
-  exitPickSlotMode
+  exitPickSlotMode,
+  getSearchMode,
+  setSearchMode
 } from "./select/selectDefaultSearch.js";
 
 import {
@@ -90,7 +98,9 @@ import {
   setLastScreen,
   applyBootForceDefaultsIfNeeded,
   persistSelectStateByBase,
-  restoreFromPersistIfPossible
+  restoreFromPersistIfPossible,
+  readPersistedSelectSettings,
+  persistSelectSettings
 } from "./select/selectPersistence.js";
 
 // Option 4 (render helpers)
@@ -123,6 +133,8 @@ const DEFAULT_START_IDS = ["shawshank", "godfather", "taxi_driver", "pulp_fictio
 // Ratatouille trial constants
 const RATATOUILLE_ARCHETYPE_ID = "ratatouille_only";
 const LS_RATA_TRIAL = "rpg_ratatouille_trial_v1";
+const LS_SELECT_EXPANDED_CACHE = "rpg_select_expanded_cache_v1";
+const LS_SELECT_EXPANDED_OVERRIDES = "rpg_select_expanded_overrides_v1";
 
 // Apply boot-time defaults rule exactly once on module load
 applyBootForceDefaultsIfNeeded();
@@ -152,6 +164,12 @@ const state = {
 
   uiMode: "select",
   overlayPayload: null
+  ,
+  selectedArchetypeId: "custom",
+  settingsOpen: false,
+  settingsRow: 0,
+  listViewMode: "default",
+  expandedSlotOverrides: [null, null, null, null]
 
   // Search module will attach its own sub-state via ensureSearchState(state)
 };
@@ -161,6 +179,95 @@ const state = {
 // -----------------------
 let layeredReady = false;
 let layeredLoading = false;
+
+// Secret quick-fill code on Select: 7 -> 1 -> 1
+let selectDevCodeStep = 0;
+let selectDevCodeTimerMs = 0;
+const SELECT_DEV_CODE_TIMEOUT_MS = 1200;
+
+function resetSelectDevCode() {
+  selectDevCodeStep = 0;
+  selectDevCodeTimerMs = 0;
+}
+
+function apply711MoviePreset() {
+  const targetIds = ["purple_rain", "office_space", "tron", "harry_potter_2001"];
+  const baseVisible = getVisibleMoviesBase();
+  const byId = new Map();
+  for (let i = 0; i < baseVisible.length; i++) byId.set(String(baseVisible[i]?.id || ""), i);
+
+  const filled = new Array(SLOT_COUNT).fill(0);
+  const overrides = new Array(SLOT_COUNT).fill(null);
+
+  for (let i = 0; i < SLOT_COUNT; i++) {
+    const id = String(targetIds[i] || "");
+    if (id && byId.has(id)) {
+      filled[i] = byId.get(id);
+      continue;
+    }
+    if (id && GameState?.catalog?.byId?.[id]) {
+      filled[i] = 0;
+      overrides[i] = id;
+    }
+  }
+
+  state.slots = filled;
+  state.expandedSlotOverrides = overrides;
+  state.activeSlot = 0;
+  state.focus = "movies";
+  state.confirmPending = false;
+  state.selectedArchetypeId = "custom";
+  state.archetypeIndex = 0;
+  state.archetypeConfirmed = false;
+  state.confirmedArchetypeIndex = 0;
+
+  try {
+    closeSearchDropdown(state);
+    exitPickSlotMode(state);
+  } catch {}
+
+  persist();
+  playUIConfirmBlip();
+}
+
+function updateSelectDevCode(dtMs = 16.67) {
+  if (state.uiMode !== "select") {
+    resetSelectDevCode();
+    return false;
+  }
+
+  if (selectDevCodeStep > 0) {
+    selectDevCodeTimerMs += dtMs;
+    if (selectDevCodeTimerMs > SELECT_DEV_CODE_TIMEOUT_MS) resetSelectDevCode();
+  }
+
+  if (Input.pressed("7")) {
+    Input.consume("7");
+    selectDevCodeStep = 1;
+    selectDevCodeTimerMs = 0;
+    return false;
+  }
+
+  if (Input.pressed("1")) {
+    Input.consume("1");
+
+    if (selectDevCodeStep === 1) {
+      selectDevCodeStep = 2;
+      selectDevCodeTimerMs = 0;
+      return false;
+    }
+
+    if (selectDevCodeStep === 2) {
+      resetSelectDevCode();
+      apply711MoviePreset();
+      return true;
+    }
+
+    resetSelectDevCode();
+  }
+
+  return false;
+}
 
 async function bootNavLayersFromGestureIfNeeded() {
   if (layeredReady) return true;
@@ -199,6 +306,20 @@ function safeGetJSON(key) {
 function safeSetJSON(key, obj) {
   try {
     window?.localStorage?.setItem(key, JSON.stringify(obj));
+  } catch {}
+}
+
+function safeGetLS(key) {
+  try {
+    return window?.localStorage?.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeRemoveLS(key) {
+  try {
+    window?.localStorage?.removeItem(key);
   } catch {}
 }
 
@@ -247,6 +368,35 @@ function getMovieById(id) {
       imdb: 7.0
     }
   );
+}
+
+function findEnemyById(id) {
+  const key = String(id || "");
+  return enemies.find((e) => String(e?.id || "") === key) || null;
+}
+
+function buildEggBattleProgressForMovie(movie, targetLevel = 9) {
+  const base = calculateMovieStats(movie || {});
+  let maxHp = Math.max(1, Math.round(Number(base.maxHp || 1)));
+  let atk = Math.max(1, Math.round(Number(base.atk || 1)));
+  let def = Math.max(1, Math.round(Number(base.def || 1)));
+  const level = Math.max(1, Math.floor(Number(targetLevel || 1)));
+
+  // Mirror xpSystem level growth so stats reflect the target actor level.
+  for (let l = 1; l < level; l++) {
+    const hpGain = Math.max(1, Math.round(maxHp * 0.31));
+    maxHp = Math.max(1, maxHp + hpGain);
+    atk = Math.max(1, Math.max(atk + 1, Math.round(atk * (1 + 0.22))));
+    def = Math.max(1, Math.max(def + 1, Math.round(def * (1 + 0.25))));
+  }
+
+  return {
+    level,
+    xp: 0,
+    maxHp,
+    atk,
+    def
+  };
 }
 
 function getArchetypeById(id) {
@@ -340,6 +490,19 @@ function closeOverlay() {
   state.overlayPayload = null;
 }
 
+function settingsButtonRect() {
+  const sr = searchRects({ SCREEN, L });
+  return { x: sr.right.x + sr.right.w + 6, y: sr.right.y, w: 20, h: sr.right.h };
+}
+
+function settingsOverlayRect() {
+  const w = 250;
+  const h = 128;
+  const x = Math.floor((SCREEN.W - w) / 2);
+  const y = 78;
+  return { x, y, w, h };
+}
+
 function maybeOpenOverlayFromGlobalEvents() {
   if (state.uiMode !== "select") return;
 
@@ -367,14 +530,209 @@ function maybeOpenOverlayFromGlobalEvents() {
 
 function getVisibleMoviesBase() {
   ensureUnlockState(GameState);
-  const visible = getAvailableMovies(GameState.unlocks);
-  return Array.isArray(visible) && visible.length > 0 ? visible : movies;
+  ensureMatineeState(GameState);
+  const visible = getAvailableMovies(GameState.unlocks, GameState.matinee);
+  const localVisible = Array.isArray(visible) && visible.length > 0 ? visible : movies;
+  const expanded = Array.isArray(GameState?.catalog?.expandedMovies) ? GameState.catalog.expandedMovies : [];
+  return localVisible.concat(expanded);
+}
+
+function normalizeListViewMode(mode) {
+  const m = String(mode || "").trim().toLowerCase();
+  if (m === "alphabetical" || m === "genre" || m === "year") return m;
+  return "default";
+}
+
+function inferMovieYear(movie) {
+  const direct = Number(movie?.year ?? movie?.releaseYear ?? movie?.release_date?.slice?.(0, 4));
+  if (Number.isFinite(direct) && direct > 1800) return direct;
+  const metaY = Number(state.movieMeta?.[String(movie?.id || "")]?.year);
+  return Number.isFinite(metaY) && metaY > 1800 ? metaY : 0;
+}
+
+function inferMovieGenre(movie) {
+  const meta = state.movieMeta?.[String(movie?.id || "")];
+  const g = String(meta?.primaryGenre || meta?.secondaryGenre || movie?.primaryGenre || movie?.genre || "");
+  return g || "UNKNOWN";
+}
+
+function compareByTitle(a, b) {
+  const ta = String(a?.title || "");
+  const tb = String(b?.title || "");
+  return ta.localeCompare(tb);
+}
+
+function getSortedBaseByListView(base) {
+  const mode = normalizeListViewMode(state.listViewMode);
+  if (!Array.isArray(base) || base.length <= 1 || mode === "default") return base;
+  const curated = [];
+  const expanded = [];
+  for (const m of base) {
+    const id = String(m?.id || "");
+    const isExpanded = !!m?.isExpanded || id.startsWith("tmdb_");
+    if (isExpanded) expanded.push(m);
+    else curated.push(m);
+  }
+  const out = curated.slice();
+  if (mode === "alphabetical") {
+    out.sort(compareByTitle);
+    return out.concat(expanded);
+  }
+  if (mode === "genre") {
+    out.sort((a, b) => {
+      const ga = inferMovieGenre(a);
+      const gb = inferMovieGenre(b);
+      const gcmp = ga.localeCompare(gb);
+      if (gcmp !== 0) return gcmp;
+      return compareByTitle(a, b);
+    });
+    return out.concat(expanded);
+  }
+  if (mode === "year") {
+    out.sort((a, b) => {
+      const ya = inferMovieYear(a);
+      const yb = inferMovieYear(b);
+      if (ya !== yb) return ya - yb;
+      return compareByTitle(a, b);
+    });
+  }
+  return out.concat(expanded);
+}
+
+function ensureCatalogCacheState() {
+  if (!GameState.catalog || typeof GameState.catalog !== "object") {
+    GameState.catalog = { expandedMovies: [], byId: {} };
+  }
+  if (!Array.isArray(GameState.catalog.expandedMovies)) GameState.catalog.expandedMovies = [];
+  if (!GameState.catalog.byId || typeof GameState.catalog.byId !== "object") GameState.catalog.byId = {};
+}
+
+function normalizeExpandedId(rawId, providerId = null, title = "") {
+  let id = String(rawId || "").trim();
+  if (id.startsWith("tmdb_tmdb_")) id = id.slice("tmdb_".length);
+  if (id.startsWith("tmdb_")) return id;
+  const pid = Number(providerId);
+  if (Number.isFinite(pid)) return `tmdb_${pid}`;
+  if (id) return `tmdb_${id}`;
+  const fallback = String(title || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  return fallback ? `tmdb_${fallback}` : "";
+}
+
+function loadExpandedCatalogCache() {
+  ensureCatalogCacheState();
+  const raw = safeGetLS(LS_SELECT_EXPANDED_CACHE);
+  if (!raw) return;
+  let parsed = null;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return;
+  }
+  const arr = Array.isArray(parsed?.expandedMovies) ? parsed.expandedMovies : [];
+  if (!arr.length) return;
+
+  const nextExpanded = [];
+  const nextById = {};
+  for (const rec of arr) {
+    if (!rec || typeof rec !== "object") continue;
+    const id = normalizeExpandedId(rec.id, rec.providerId, rec.title);
+    if (!id) continue;
+    const normalized = {
+      id,
+      title: String(rec.title || "Unknown"),
+      shortTitle: String(rec.shortTitle || rec.title || "Unknown"),
+      runtime: Number.isFinite(Number(rec.runtime)) ? Number(rec.runtime) : 110,
+      imdb: Number.isFinite(Number(rec.imdb)) ? Number(rec.imdb) : 7.0,
+      genres: Array.isArray(rec.genres) ? rec.genres.slice(0, 8).map((g) => String(g)) : [],
+      primaryGenre: String(rec.primaryGenre || "").toUpperCase() || null,
+      secondaryGenre: String(rec.secondaryGenre || "").toUpperCase() || null,
+      year: Number.isFinite(Number(rec.year)) ? Number(rec.year) : 0,
+      release_date: String(rec.release_date || ""),
+      posterUrl: String(rec.posterUrl || ""),
+      provider: "tmdb",
+      providerId: Number.isFinite(Number(rec.providerId)) ? Number(rec.providerId) : null,
+      isExpanded: true
+    };
+    if (nextById[id]) continue;
+    nextById[id] = normalized;
+    nextExpanded.push(normalized);
+    if (nextExpanded.length >= 500) break;
+  }
+  GameState.catalog.byId = nextById;
+  GameState.catalog.expandedMovies = nextExpanded;
+}
+
+function saveExpandedCatalogCache() {
+  ensureCatalogCacheState();
+  const out = {
+    expandedMovies: (GameState.catalog.expandedMovies || []).slice(0, 500)
+  };
+  safeSetJSON(LS_SELECT_EXPANDED_CACHE, out);
+}
+
+function clearExpandedCatalogCache() {
+  ensureCatalogCacheState();
+  const prevBase = getDisplayMovies().base;
+  const prevExpandedIds = new Set(
+    (GameState.catalog.expandedMovies || []).map((m) => String(m?.id || "")).filter(Boolean)
+  );
+
+  GameState.catalog.byId = {};
+  GameState.catalog.expandedMovies = [];
+  safeRemoveLS(LS_SELECT_EXPANDED_CACHE);
+
+  // Any slot currently pointing at an expanded entry is reset to first movie.
+  if (Array.isArray(state.slots)) {
+    for (let i = 0; i < SLOT_COUNT; i++) {
+      const v = state.slots[i];
+      if (typeof v !== "number" || !Number.isFinite(v) || v < 0 || v >= prevBase.length) continue;
+      const id = String(prevBase[v]?.id || "");
+      if (id && prevExpandedIds.has(id)) state.slots[i] = 0;
+    }
+  }
+  state.expandedSlotOverrides = [null, null, null, null];
+  safeRemoveLS(LS_SELECT_EXPANDED_OVERRIDES);
+}
+
+function rememberExpandedMovie(movieLike) {
+  ensureCatalogCacheState();
+  if (!movieLike || typeof movieLike !== "object") return null;
+  const providerId = Number(movieLike.providerId);
+  const id = normalizeExpandedId(movieLike.id, providerId, movieLike.title);
+  if (!id) return null;
+
+  const normalized = {
+    id,
+    title: String(movieLike.title || "Unknown"),
+    shortTitle: String(movieLike.shortTitle || movieLike.title || "Unknown"),
+    runtime: Number.isFinite(Number(movieLike.runtime)) ? Number(movieLike.runtime) : 110,
+    imdb: Number.isFinite(Number(movieLike.imdb)) ? Number(movieLike.imdb) : 7.0,
+    genres: Array.isArray(movieLike.genres) ? movieLike.genres.slice(0, 8).map((g) => String(g)) : [],
+    primaryGenre: String(movieLike.primaryGenre || "").toUpperCase() || null,
+    secondaryGenre: String(movieLike.secondaryGenre || "").toUpperCase() || null,
+    year: inferMovieYear(movieLike),
+    release_date: String(movieLike.release_date || ""),
+    posterUrl: String(movieLike.posterUrl || ""),
+    provider: "tmdb",
+    providerId: Number.isFinite(providerId) ? providerId : null,
+    isExpanded: true
+  };
+
+  const prev = GameState.catalog.byId[id];
+  GameState.catalog.byId[id] = { ...(prev || {}), ...normalized };
+  if (!GameState.catalog.expandedMovies.some((m) => String(m?.id || "") === id)) {
+    GameState.catalog.expandedMovies.push(GameState.catalog.byId[id]);
+    saveExpandedCatalogCache();
+  } else {
+    saveExpandedCatalogCache();
+  }
+  return id;
 }
 
 // Kept for existing slot cycling + randomize behavior.
 // (Search system does its own suggestions list.)
 function getDisplayMovies() {
-  const base = getVisibleMoviesBase();
+  const base = getSortedBaseByListView(getVisibleMoviesBase());
   const q = String(state.searchQuery || "").trim().toLowerCase();
   if (!q) return { base, display: base, displayToBase: null };
 
@@ -392,8 +750,32 @@ function getDisplayMovies() {
   return { base, display, displayToBase };
 }
 
+function reconcileExpandedSlotOverrides(baseVisible) {
+  if (!Array.isArray(state.expandedSlotOverrides)) {
+    state.expandedSlotOverrides = [null, null, null, null];
+  }
+  const base = Array.isArray(baseVisible) ? baseVisible : [];
+  if (!base.length) return;
+  const byId = new Map();
+  for (let i = 0; i < base.length; i++) byId.set(String(base[i]?.id || ""), i);
+
+  for (let i = 0; i < SLOT_COUNT; i++) {
+    const overrideId = String(state.expandedSlotOverrides[i] || "");
+    if (!overrideId) continue;
+    if (!byId.has(overrideId)) {
+      // Keep override when catalog still knows this movie; base list can lag/order-shift.
+      if (GameState?.catalog?.byId?.[overrideId]) continue;
+      state.expandedSlotOverrides[i] = null;
+      continue;
+    }
+    const idx = byId.get(overrideId);
+    if (typeof state.slots[i] !== "string") state.slots[i] = idx;
+  }
+}
+
 function getSelectableArchetypes() {
   ensureUnlockState(GameState);
+  ensureMatineeState(GameState);
 
   const list = [{ id: "custom", name: "Custom", movieIds: [] }];
 
@@ -401,6 +783,18 @@ function getSelectableArchetypes() {
     if (!a) continue;
     if (!a.hidden) list.push(a);
     else if (isArchetypeUnlocked(GameState, a.id)) list.push(a);
+  }
+
+  // Keep test_test pinned to the end when unlocked.
+  const idx = list.findIndex((a) => a?.id === "test_test");
+  if (idx > -1) {
+    const [pinned] = list.splice(idx, 1);
+    list.push(pinned);
+  }
+
+  // Campaign-only discovered matinee sets are appended in unlock order.
+  for (const setArch of getMatineeSetArchetypes(GameState)) {
+    list.push(setArch);
   }
 
   return list;
@@ -413,20 +807,37 @@ function setArchetypeByIndex(nextIndex) {
   state.archetypeIndex = clampIndex(nextIndex, archetypes.length);
 
   const chosen = archetypes[state.archetypeIndex];
-  if (!chosen || chosen.id === "custom") return;
+  if (!chosen || chosen.id === "custom") {
+    state.selectedArchetypeId = "custom";
+    return;
+  }
+  state.selectedArchetypeId = String(chosen.id || "custom");
 
   const byId = new Map();
   for (let i = 0; i < baseVisible.length; i++) byId.set(baseVisible[i].id, i);
 
   const filled = new Array(SLOT_COUNT).fill(0);
+  const overrides = new Array(SLOT_COUNT).fill(null);
   const ids = Array.isArray(chosen.movieIds) ? chosen.movieIds : [];
 
   for (let i = 0; i < SLOT_COUNT; i++) {
-    const id = ids[i];
-    filled[i] = id && byId.has(id) ? byId.get(id) : 0;
+    const id = String(ids[i] || "");
+    if (id && byId.has(id)) {
+      filled[i] = byId.get(id);
+      continue;
+    }
+    // If archetype points to a valid catalog movie that isn't currently visible,
+    // keep it via slot override instead of collapsing to base index 0.
+    if (id && GameState?.catalog?.byId?.[id]) {
+      filled[i] = 0;
+      overrides[i] = id;
+      continue;
+    }
+    filled[i] = 0;
   }
 
   state.slots = filled;
+  state.expandedSlotOverrides = overrides;
   state.confirmPending = false;
 
   // choosing an archetype should exit search dropdown + pick-slot mode
@@ -468,6 +879,8 @@ function applyDefaults(baseVisible) {
 
   state.searchQuery = "";
   state.confirmPending = false;
+  state.selectedArchetypeId = "custom";
+  state.expandedSlotOverrides = [null, null, null, null];
 
   state.uiMode = "select";
   state.overlayPayload = null;
@@ -484,10 +897,73 @@ function applyDefaults(baseVisible) {
 function persist() {
   const baseVisible = getVisibleMoviesBase();
   persistSelectStateByBase({ SLOT_COUNT, state, baseVisible });
+  safeSetJSON(LS_SELECT_EXPANDED_OVERRIDES, {
+    slotOverrides: Array.isArray(state.expandedSlotOverrides)
+      ? state.expandedSlotOverrides.slice(0, SLOT_COUNT)
+      : [null, null, null, null]
+  });
+}
+
+function currentSearchEngineMode() {
+  try {
+    return getSearchMode(state) === "expanded" ? "expanded" : "curated";
+  } catch {
+    return "curated";
+  }
+}
+
+function applySearchEngineMode(nextMode) {
+  const m = String(nextMode || "") === "expanded" ? "expanded" : "curated";
+  try {
+    setSearchMode(state, m === "expanded" ? "expanded" : "local");
+  } catch {}
+}
+
+function persistSelectSettingsNow() {
+  persistSelectSettings({
+    listViewMode: normalizeListViewMode(state.listViewMode),
+    searchEngineMode: currentSearchEngineMode()
+  });
+}
+
+function remapSlotsBetweenBaseOrders(prevBase, nextBase) {
+  if (!Array.isArray(state.slots) || state.slots.length !== SLOT_COUNT) return;
+  const prev = Array.isArray(prevBase) ? prevBase : [];
+  const next = Array.isArray(nextBase) ? nextBase : [];
+  if (!prev.length || !next.length) return;
+
+  const nextById = new Map();
+  for (let i = 0; i < next.length; i++) nextById.set(String(next[i]?.id || ""), i);
+
+  for (let i = 0; i < SLOT_COUNT; i++) {
+    const v = state.slots[i];
+    if (typeof v !== "number" || !Number.isFinite(v) || v < 0 || v >= prev.length) continue;
+    const id = String(prev[v]?.id || "");
+    if (!id) continue;
+    if (nextById.has(id)) state.slots[i] = nextById.get(id);
+  }
+}
+
+function applyListViewMode(nextMode) {
+  const next = normalizeListViewMode(nextMode);
+  if (state.listViewMode === next) return;
+  const prevBase = getDisplayMovies().base;
+  state.listViewMode = next;
+  const nextBase = getDisplayMovies().base;
+  remapSlotsBetweenBaseOrders(prevBase, nextBase);
+  persist();
+  persistSelectSettingsNow();
+}
+
+function loadSelectSettings() {
+  const persisted = readPersistedSelectSettings() || {};
+  state.listViewMode = normalizeListViewMode(persisted.listViewMode);
+  applySearchEngineMode(persisted.searchEngineMode);
 }
 
 function restoreOrDefault() {
-  const baseVisible = getVisibleMoviesBase();
+  // Keep base ordering consistent with placement/persist paths.
+  const baseVisible = getDisplayMovies().base;
   ensureStatsState(GameState);
   mirrorRatatouilleTrialToGameState();
   ensureRataStreak();
@@ -497,8 +973,22 @@ function restoreOrDefault() {
     ensureSearchState(state);
   } catch {}
 
+  try {
+    const ov = safeGetJSON(LS_SELECT_EXPANDED_OVERRIDES);
+    const arr = Array.isArray(ov?.slotOverrides) ? ov.slotOverrides : null;
+    if (arr) {
+      state.expandedSlotOverrides = new Array(SLOT_COUNT).fill(null).map((_, i) => {
+        const v = String(arr[i] || "").trim();
+        return v || null;
+      });
+    } else if (!Array.isArray(state.expandedSlotOverrides)) {
+      state.expandedSlotOverrides = [null, null, null, null];
+    }
+  } catch {}
+
   if (Array.isArray(state.slots) && state.slots.length === SLOT_COUNT) {
     normalizeSlotsToBaseLength(state.slots, SLOT_COUNT, baseVisible.length);
+    reconcileExpandedSlotOverrides(baseVisible);
     const archetypes = getSelectableArchetypes();
     state.archetypeIndex = clampIndex(state.archetypeIndex, archetypes.length);
     state.confirmedArchetypeIndex = clampIndex(state.confirmedArchetypeIndex, archetypes.length);
@@ -514,6 +1004,7 @@ function restoreOrDefault() {
   });
 
   if (!ok) applyDefaults(baseVisible);
+  reconcileExpandedSlotOverrides(baseVisible);
 
   const archetypes = getSelectableArchetypes();
   state.archetypeIndex = clampIndex(state.archetypeIndex, archetypes.length);
@@ -533,6 +1024,7 @@ function clearAllSlotsToBlank() {
 
   state.searchQuery = "";
   state.confirmPending = false;
+  state.expandedSlotOverrides = [null, null, null, null];
 
   state.uiMode = "select";
   state.overlayPayload = null;
@@ -547,6 +1039,9 @@ function clearAllSlotsToBlank() {
 
 function goHome() {
   resetRandomizeStreak();
+  if (String(GameState?.specialFlow?.type || "") === "eggBattle") {
+    GameState.specialFlow = null;
+  }
 
   try {
     exitPickSlotMode(state);
@@ -572,34 +1067,75 @@ function confirmPicks(baseVisible) {
 
   const fallback = getMovieById("unknown");
 
-  GameState.party.movies = resolvePartyFromSlots({
+  const resolved = resolvePartyFromSlots({
     SLOT_COUNT,
     movieMeta,
     slots: state.slots,
     baseVisible,
     fallbackMovie: fallback
   });
+  for (let i = 0; i < SLOT_COUNT; i++) {
+    const overrideId = String(state.expandedSlotOverrides?.[i] || "");
+    if (!overrideId) continue;
+    const overrideMovie = GameState?.catalog?.byId?.[overrideId] || null;
+    if (overrideMovie) resolved[i] = overrideMovie;
+  }
+  GameState.party.movies = resolved;
+
+  const rosterIds = (GameState.party.movies || []).map((m) => String(m?.id || "")).filter(Boolean);
+  if (!GameState.flags) GameState.flags = {};
+  GameState.flags.activeArchetypeId = String(state.selectedArchetypeId || "custom");
 
   persist();
-  setLastScreen("levelIntro");
+  const specialType = String(GameState?.specialFlow?.type || "");
+  const isEggBattle = specialType === "eggBattle";
+  setLastScreen(isEggBattle ? "startingItemsPick" : "levelIntro");
 
-  GameState.currentLevel = 1;
+  GameState.currentLevel = isEggBattle ? 32 : 1;
   GameState.enemyTemplate = null;
   GameState.enemy = null;
   GameState.campaign = {
-    onefourShown: false,
+    onefourShown: isEggBattle ? true : false,
     effects: { first: null, fourth: null },
     _onefourAppliedThisBattle: false,
     flavor: {},
     runtime: {}
   };
 
+  if (isEggBattle) {
+    GameState.runMode = "campaign";
+    GameState.enemyTemplate = findEnemyById("film_professor");
+    // Egg battle flow: force all selected actors to spawn with level-9 stats.
+    const progressMap = {};
+    for (const movie of (GameState.party.movies || [])) {
+      const id = String(movie?.id || "");
+      if (!id) continue;
+      progressMap[id] = buildEggBattleProgressForMovie(movie, 9);
+    }
+    GameState.party.progress = progressMap;
+    if (!GameState.specialFlow || typeof GameState.specialFlow !== "object") {
+      GameState.specialFlow = {};
+    }
+    GameState.specialFlow.type = "eggBattle";
+    GameState.specialFlow.hideEnemyLevel = true;
+  } else {
+    // Campaign run bookkeeping for hidden-movie/set logic.
+    recordCampaignRunStart(GameState, rosterIds, GameState.flags.activeArchetypeId);
+    recordExactLineupRun(GameState, rosterIds);
+    discoverSetsFromRoster(GameState, rosterIds);
+    const setIds = getActiveUnlockedSetIdsForRoster(GameState, rosterIds);
+    if (!GameState.campaign) GameState.campaign = {};
+    GameState.campaign.activeMatineeSetIds = Array.isArray(setIds) && setIds.length ? setIds : [];
+    evaluateExtraMovieUnlocks(GameState);
+    GameState.party.progress = {};
+  }
+
   playUIConfirmBlip();
 
   try {
     MenuLayers.stop({ fadeMs: 180 });
   } catch {}
-  changeScreen("levelIntro");
+  changeScreen(isEggBattle ? "startingItemsPick" : "levelIntro");
 }
 
 // -----------------------
@@ -618,6 +1154,11 @@ export const SelectScreen = {
       ensureSearchState(state);
       bindSearchKeyboard(Input, state);
     } catch {}
+    try {
+      ensureCatalogCacheState();
+      loadExpandedCatalogCache();
+      loadSelectSettings();
+    } catch {}
 
     try {
       syncOptionsAudioNow();
@@ -625,6 +1166,7 @@ export const SelectScreen = {
     try {
       MenuLayers.setMix(NAV_MIX, 0);
     } catch {}
+    resetSelectDevCode();
   },
 
   update(mouse) {
@@ -661,6 +1203,7 @@ export const SelectScreen = {
     if (!Input.isDown("Confirm")) state.enterArmed = true;
 
     const { base: baseVisible, displayToBase } = getDisplayMovies();
+    reconcileExpandedSlotOverrides(baseVisible);
     const archetypes = getSelectableArchetypes();
 
     syncSelectTextInput({
@@ -673,13 +1216,15 @@ export const SelectScreen = {
     // ensure search exists and consume any queued typing into it
     try {
       ensureSearchState(state);
-      updateSearchFromQueue(state, baseVisible, { SCREEN, L });
+      updateSearchFromQueue(state, baseVisible, { SCREEN, L, Input });
     } catch {}
 
     state.inputMode = detectKeyboardInput(Input, mouse, state.inputMode);
 
     // -----------------------
-    // Search "locks" Back/Confirm/Toggle while active (prevents global behavior)
+    // Search lock:
+    // - while search owns focus, prevent gameplay/navigation hotkeys from firing
+    // - keep settings overlay exempt so its own keyboard controls still work
     // -----------------------
     ensureSearchState(state);
     const searchActive =
@@ -687,7 +1232,12 @@ export const SelectScreen = {
       (state.search?.suggestions && state.search.suggestions.length > 0) ||
       !!state.search?.pickSlotMode;
 
-    if (searchActive) {
+    if (searchActive && !state.settingsOpen) {
+      // Hard override: Backspace must never behave like "Back" while search is active.
+      // Search engine handles Backspace for text editing directly.
+      if (Input.pressedCode?.("Backspace")) {
+        Input.consumeCode?.("Backspace");
+      }
       if (Input.pressed("Back")) Input.consume("Back");
       if (Input.pressed("Confirm")) Input.consume("Confirm");
       if (Input.pressed("Toggle")) Input.consume("Toggle");
@@ -698,6 +1248,83 @@ export const SelectScreen = {
       if (Input.pressed("Right")) Input.consume("Right");
       if (Input.pressed("Up")) Input.consume("Up");
       if (Input.pressed("Down")) Input.consume("Down");
+    }
+
+    if (state.settingsOpen) {
+      const listModes = ["default", "alphabetical", "genre", "year"];
+      const searchModes = ["curated", "expanded"];
+
+      if (Input.pressed("Back") || Input.pressed("Toggle")) {
+        state.settingsOpen = false;
+        persistSelectSettingsNow();
+        playUIBackBlip();
+        return;
+      }
+      if (Input.pressed("Up")) {
+        state.settingsRow = (state.settingsRow + 2) % 3;
+        playUIMoveBlip();
+        return;
+      }
+      if (Input.pressed("Down")) {
+        state.settingsRow = (state.settingsRow + 1) % 3;
+        playUIMoveBlip();
+        return;
+      }
+      if ((Input.pressed("Left") || Input.pressed("Right")) && state.settingsRow <= 1) {
+        const dir = Input.pressed("Left") ? -1 : +1;
+        if (state.settingsRow === 0) {
+          const idx = Math.max(0, listModes.indexOf(normalizeListViewMode(state.listViewMode)));
+          applyListViewMode(listModes[(idx + dir + listModes.length) % listModes.length]);
+        } else {
+          const now = currentSearchEngineMode();
+          const idx = Math.max(0, searchModes.indexOf(now));
+          const next = searchModes[(idx + dir + searchModes.length) % searchModes.length];
+          applySearchEngineMode(next);
+          persistSelectSettingsNow();
+        }
+        playUIMoveBlip();
+        return;
+      }
+      if (Input.pressed("Confirm") && state.settingsRow === 2) {
+        clearExpandedCatalogCache();
+        persist();
+        playUIConfirmBlip();
+        return;
+      }
+      if (mouse?.clicked) {
+        const r = settingsOverlayRect();
+        if (!pointInRect(mouse.x, mouse.y, r)) {
+          state.settingsOpen = false;
+          persistSelectSettingsNow();
+          playUIBackBlip();
+          return;
+        }
+        const row1Y = r.y + 30;
+        const row2Y = r.y + 62;
+        const row3Y = r.y + 94;
+        const row = Math.abs(mouse.y - row1Y) < 12 ? 0 : (Math.abs(mouse.y - row2Y) < 12 ? 1 : (Math.abs(mouse.y - row3Y) < 12 ? 2 : -1));
+        if (row >= 0) {
+          state.settingsRow = row;
+          const dir = mouse.x < (r.x + r.w / 2) ? -1 : +1;
+          if (row === 0) {
+            const listModes = ["default", "alphabetical", "genre", "year"];
+            const idx = Math.max(0, listModes.indexOf(normalizeListViewMode(state.listViewMode)));
+            applyListViewMode(listModes[(idx + dir + listModes.length) % listModes.length]);
+          } else if (row === 1) {
+            const searchModes = ["curated", "expanded"];
+            const now = currentSearchEngineMode();
+            const idx = Math.max(0, searchModes.indexOf(now));
+            const next = searchModes[(idx + dir + searchModes.length) % searchModes.length];
+            applySearchEngineMode(next);
+            persistSelectSettingsNow();
+          } else {
+            clearExpandedCatalogCache();
+            persist();
+          }
+          playUIMoveBlip();
+        }
+      }
+      return;
     }
 
     if (!Input.pressed("Randomize") && shouldResetStreakThisFrame(Input, mouse, state.confirmPending)) {
@@ -720,6 +1347,9 @@ export const SelectScreen = {
     }
 
     setLastScreen("select");
+
+    // Secret quick-fill: 7 -> 1 -> 1
+    if (updateSelectDevCode(16.67)) return;
 
     // 2) Confirm pending handler
     if (
@@ -774,8 +1404,57 @@ export const SelectScreen = {
         searchRects: () => searchRects({ SCREEN, L }),
         slotBounds: (i) => slotBounds({ i, SLOT_COUNT, SCREEN, L }),
         baseVisible,
-        onPlaceMovie: (slotIndex, baseMovieIndex) => {
-          state.slots[slotIndex] = baseMovieIndex;
+        onPlaceMovie: (slotIndex, baseMovieIndex, suggestion) => {
+          let chosenIndex = baseMovieIndex;
+          let overrideId = null;
+          if (!(Number.isFinite(chosenIndex) && chosenIndex >= 0)) {
+            const srcMovie = suggestion?.movie || null;
+            let rememberedId = rememberExpandedMovie(srcMovie);
+            if (!rememberedId) {
+              const fallbackId = normalizeExpandedId(
+                srcMovie?.id,
+                suggestion?.tmdbId ?? srcMovie?.providerId,
+                srcMovie?.title || suggestion?.title || ""
+              );
+              if (fallbackId) {
+                const fallbackMovie = {
+                  id: fallbackId,
+                  title: String(srcMovie?.title || suggestion?.title || "Unknown"),
+                  shortTitle: String(srcMovie?.shortTitle || srcMovie?.title || suggestion?.title || "Unknown"),
+                  runtime: Number.isFinite(Number(srcMovie?.runtime)) ? Number(srcMovie.runtime) : 110,
+                  imdb: Number.isFinite(Number(srcMovie?.imdb)) ? Number(srcMovie.imdb) : 7.0,
+                  year: inferMovieYear(srcMovie || suggestion || {}),
+                  release_date: String(srcMovie?.release_date || ""),
+                  posterUrl: String(srcMovie?.posterUrl || ""),
+                  provider: "tmdb",
+                  providerId: Number.isFinite(Number(suggestion?.tmdbId ?? srcMovie?.providerId))
+                    ? Number(suggestion?.tmdbId ?? srcMovie?.providerId)
+                    : null,
+                  isExpanded: true
+                };
+                rememberedId = rememberExpandedMovie(fallbackMovie);
+              }
+            }
+            // Important: slots are indexed against the currently displayed base
+            // (which may be list-view sorted), so resolve index from that same base.
+            const displayBase = getDisplayMovies().base;
+            let idx = displayBase.findIndex((m) => String(m?.id || "") === String(rememberedId || ""));
+            if (idx < 0) {
+              const fallbackBase = getSortedBaseByListView(getVisibleMoviesBase());
+              idx = fallbackBase.findIndex((m) => String(m?.id || "") === String(rememberedId || ""));
+            }
+            const prev = state.slots?.[slotIndex];
+            const prevIndex = (typeof prev === "number" && Number.isFinite(prev)) ? prev : 0;
+            chosenIndex = idx >= 0 ? idx : prevIndex;
+            overrideId = String(rememberedId || "");
+          } else {
+            const movie = baseVisible[chosenIndex] || null;
+            if (String(movie?.id || "").startsWith("tmdb_")) {
+              overrideId = String(movie.id);
+            }
+          }
+          state.slots[slotIndex] = chosenIndex;
+          state.expandedSlotOverrides[slotIndex] = overrideId || null;
           state.focus = "movies";
           state.activeSlot = slotIndex;
           state.confirmPending = false;
@@ -801,9 +1480,8 @@ export const SelectScreen = {
           persist();
           playUIBackBlip();
         },
-        onEnterPickMode: (baseMovieIndex) => {
+        onEnterPickMode: () => {
           try {
-            enterPickSlotMode(state, baseMovieIndex);
             closeSearchDropdown(state);
           } catch {}
           persist();
@@ -815,6 +1493,20 @@ export const SelectScreen = {
 
       if (handledSearch) return;
     } catch {}
+
+    if (mouse?.clicked && pointInRect(mouse.x, mouse.y, settingsButtonRect())) {
+      state.settingsOpen = !state.settingsOpen;
+      if (state.settingsOpen) {
+        state.focus = "movies";
+        try {
+          closeSearchDropdown(state);
+          exitPickSlotMode(state);
+        } catch {}
+      }
+      if (!state.settingsOpen) persistSelectSettingsNow();
+      playUIConfirmBlip();
+      return;
+    }
 
     // 3) Global hotkeys (Clear/Back)
     if (
@@ -1024,6 +1716,8 @@ export const SelectScreen = {
     restoreOrDefault();
 
     const { base: baseVisible } = getDisplayMovies();
+    reconcileExpandedSlotOverrides(baseVisible);
+    const getPosterPathForRender = (movie) => String(movie?.posterUrl || "") || getLocalPosterPath(movie);
     const archetypes = getSelectableArchetypes();
 
     const chosenIndex = state.archetypeConfirmed
@@ -1122,6 +1816,15 @@ export const SelectScreen = {
     ctx.font = s.iconFont || "13px monospace";
     ctx.fillText("⌕", sr.right.x + 5, sr.right.y + 15);
 
+    const sb = settingsButtonRect();
+    ctx.fillStyle = C().panel || "#111";
+    ctx.fillRect(sb.x, sb.y, sb.w, sb.h);
+    ctx.strokeStyle = state.settingsOpen ? (C().highlight || "#ff0") : (C().stroke || "#555");
+    ctx.strokeRect(sb.x, sb.y, sb.w, sb.h);
+    ctx.fillStyle = C().text || "#fff";
+    ctx.font = "11px monospace";
+    ctx.fillText("S", sb.x + 6, sb.y + 14);
+
     // Slots
     const arrowFont = S()?.arrowFont || "13px monospace";
     const upChar = S()?.arrowUpChar || "▲";
@@ -1131,7 +1834,13 @@ export const SelectScreen = {
     for (let i = 0; i < SLOT_COUNT; i++) {
       const v = state.slots[i];
       const isSpecial = isSpecialSlotValue(v);
-      const movie = !isSpecial ? baseVisible[v] : null;
+      let movie = !isSpecial ? baseVisible[v] : null;
+      if (!isSpecial) {
+        const overrideId = String(state.expandedSlotOverrides?.[i] || "");
+        if (overrideId && GameState?.catalog?.byId?.[overrideId]) {
+          movie = GameState.catalog.byId[overrideId];
+        }
+      }
 
       const isActiveMovieSlot = state.focus === "movies" && i === state.activeSlot;
 
@@ -1166,7 +1875,7 @@ export const SelectScreen = {
       if (isSpecial) {
         drawSpecialPoster(ctx, pr, v, { C, SLOT_TOKEN_BLANK, SLOT_TOKEN_RANDOM, GENRE_TOKEN_TO_DEF });
       } else {
-        const posterPath = getLocalPosterPath(movie);
+        const posterPath = getPosterPathForRender(movie);
         if (posterPath) {
           ImageCache.load(posterPath);
           const img = ImageCache.get(posterPath);
@@ -1300,11 +2009,35 @@ export const SelectScreen = {
         colors: C(),
         baseVisible,
         movieMeta: state.movieMeta,
-        getLocalPosterPath,
+        getLocalPosterPath: getPosterPathForRender,
         ImageCache
       });
     } catch {}
 
+    if (state.settingsOpen) {
+      const r = settingsOverlayRect();
+      ctx.fillStyle = "rgba(0,0,0,0.65)";
+      ctx.fillRect(0, 0, SCREEN.W, SCREEN.H);
+      ctx.fillStyle = C().panel || "#111";
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.strokeStyle = C().highlight || "#ff0";
+      ctx.strokeRect(r.x, r.y, r.w, r.h);
+
+      const listLabel = normalizeListViewMode(state.listViewMode);
+      const listPretty = listLabel.charAt(0).toUpperCase() + listLabel.slice(1);
+      const searchPretty = currentSearchEngineMode() === "expanded" ? "Expanded" : "Curated";
+      const rowY1 = r.y + 30;
+      const rowY2 = r.y + 62;
+      const rowY3 = r.y + 94;
+
+      ctx.fillStyle = state.settingsRow === 0 ? (C().highlight || "#ff0") : (C().text || "#fff");
+      ctx.font = "11px monospace";
+      ctx.fillText(`list view:   < ${listPretty} >`, r.x + 12, rowY1);
+      ctx.fillStyle = state.settingsRow === 1 ? (C().highlight || "#ff0") : (C().text || "#fff");
+      ctx.fillText(`search engine: < ${searchPretty} >`, r.x + 12, rowY2);
+      ctx.fillStyle = state.settingsRow === 2 ? (C().highlight || "#ff0") : (C().text || "#fff");
+      ctx.fillText("clear expanded cache", r.x + 12, rowY3);
+    }
     // confirm banner
     if (state.confirmPending) {
       const r = confirmBoxRect({ L });
@@ -1343,3 +2076,7 @@ export const SelectScreen = {
     }
   }
 };
+
+
+
+

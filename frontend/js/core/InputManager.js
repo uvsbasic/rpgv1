@@ -48,6 +48,9 @@ const MOVE_ACTIONS = new Set(["Up", "Down", "Left", "Right"]);
 const CONFIRM_ACTIONS = new Set(["Confirm"]);
 const BACK_ACTIONS = new Set(["Back"]);
 const SUPPRESS_GLOBAL_BLIP_SCREENS = new Set(["startingItemsPick"]);
+const REPEATABLE_ACTIONS = new Set(["Up", "Down", "Left", "Right"]);
+const ACTION_REPEAT_INITIAL_DELAY_MS = 180;
+const ACTION_REPEAT_INTERVAL_MS = 80;
 
 // Helpful for preventing browser behaviors
 const PREVENT_DEFAULT_CODES = new Set(["Backspace", "Space"]);
@@ -106,6 +109,14 @@ function isTypedChar(key) {
   return typeof key === "string" && key.length === 1;
 }
 
+function isEditableEventTarget(target) {
+  if (!target) return false;
+  const tag = String(target.tagName || "").toUpperCase();
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+  if (target.isContentEditable) return true;
+  return false;
+}
+
 export const Input = {
   // key states by code (physical keys)
   keys: {},
@@ -124,6 +135,11 @@ export const Input = {
 
   // ✅ NEW: typed character FIFO queue (for unlockTriggers)
   _typedQueue: [],
+  frameKeys: {},
+  frameActions: {},
+  frameCharKeys: {},
+  actionDownAtMs: {},
+  actionNextRepeatAtMs: {},
 
   _initialized: false,
 
@@ -141,11 +157,12 @@ export const Input = {
       const code = e.code; // "KeyW", "ArrowUp", "Space", "Enter", ...
       const key = e.key;   // "d", "D", "i", etc. (or "Enter")
 
-      if (PREVENT_DEFAULT_CODES.has(code)) e.preventDefault();
+      if (PREVENT_DEFAULT_CODES.has(code) && !isEditableEventTarget(e?.target)) e.preventDefault();
 
       const wasDown = !!this.keys[code];
       this.keys[code] = true;
       this.physicalKeys[code] = true;
+      if (!wasDown) this.frameKeys[code] = true;
 
       // Track characters (for unlock codes) using e.key
       if (isTypedChar(key)) {
@@ -164,8 +181,20 @@ export const Input = {
       // Update any actions that this code maps to
       const mappedActions = CODE_TO_ACTIONS.get(code) || [];
       for (const action of mappedActions) {
+        const wasPhysicalDown = !!this.physicalActions[action];
         this.actions[action] = true;
         this.physicalActions[action] = true;
+        if (!wasDown) this.frameActions[action] = true;
+        if (!wasPhysicalDown) {
+          const now = this._nowMs();
+          this.actionDownAtMs[action] = now;
+          this.actionNextRepeatAtMs[action] = now + ACTION_REPEAT_INITIAL_DELAY_MS;
+        }
+      }
+
+      if (isTypedChar(key) && !wasDown) {
+        const ch = key.toLowerCase();
+        this.frameCharKeys[ch] = true;
       }
 
       // Only on a "new press"
@@ -205,6 +234,10 @@ export const Input = {
         const codes = BINDINGS[action] || [];
         this.actions[action] = codes.some((c) => !!this.keys[c]);
         this.physicalActions[action] = codes.some((c) => !!this.physicalKeys[c]);
+        if (!this.physicalActions[action]) {
+          delete this.actionDownAtMs[action];
+          delete this.actionNextRepeatAtMs[action];
+        }
       }
     });
   },
@@ -222,9 +255,27 @@ export const Input = {
     return !!this.keys[resolved.value];
   },
 
-  // Backwards-compatible naming: pressed() means "is down"
+  // Backwards-compatible naming:
+  // pressed() = new-press this frame (+ repeat pulses for directional actions)
   pressed(name) {
-    return this.isDown(name);
+    const resolved = resolveNameToKind(name);
+
+    if (resolved.kind === "action") {
+      const action = resolved.value;
+      if (this.frameActions[action]) return true;
+      if (this._shouldRepeatActionNow(action)) {
+        this.frameActions[action] = true;
+        return true;
+      }
+      return false;
+    }
+    if (resolved.kind === "char") return !!this.frameCharKeys[resolved.value];
+    return !!this.frameKeys[resolved.value];
+  },
+
+  // Raw keycode edge (bypasses legacy/action remapping).
+  pressedCode(code) {
+    return !!this.frameKeys[String(code || "")];
   },
 
   // Raw physical state: unaffected by consume(), cleared only on keyup.
@@ -248,20 +299,47 @@ export const Input = {
     if (resolved.kind === "action") {
       const action = resolved.value;
       this.actions[action] = false;
+      this.frameActions[action] = false;
 
       // Clear all bound codes to prevent immediate re-trigger from held keys
       const codes = BINDINGS[action] || [];
-      for (const c of codes) this.keys[c] = false;
+      for (const c of codes) {
+        this.keys[c] = false;
+        this.frameKeys[c] = false;
+      }
       return;
     }
 
     if (resolved.kind === "char") {
       this.charKeys[resolved.value] = false;
+      this.frameCharKeys[resolved.value] = false;
       return;
     }
 
     // Raw code fallback
     this.keys[resolved.value] = false;
+    this.frameKeys[resolved.value] = false;
+  },
+
+  // Consume a physical key code directly, then refresh mapped action states.
+  consumeCode(code) {
+    const c = String(code || "");
+    if (!c) return;
+    this.keys[c] = false;
+    this.frameKeys[c] = false;
+    this.physicalKeys[c] = false;
+
+    const mappedActions = CODE_TO_ACTIONS.get(c) || [];
+    for (const action of mappedActions) {
+      const codes = BINDINGS[action] || [];
+      this.actions[action] = codes.some((k) => !!this.keys[k]);
+      this.physicalActions[action] = codes.some((k) => !!this.physicalKeys[k]);
+      this.frameActions[action] = false;
+      if (!this.physicalActions[action]) {
+        delete this.actionDownAtMs[action];
+        delete this.actionNextRepeatAtMs[action];
+      }
+    }
   },
 
   consumeIfPressed(name) {
@@ -284,10 +362,63 @@ export const Input = {
     this.charKeys = {};
     this.physicalCharKeys = {};
     this._typedQueue = [];
+    this.frameKeys = {};
+    this.frameActions = {};
+    this.frameCharKeys = {};
+    this.actionDownAtMs = {};
+    this.actionNextRepeatAtMs = {};
 
     for (const action of Object.keys(BINDINGS)) {
       this.actions[action] = false;
       this.physicalActions[action] = false;
     }
+  },
+
+  endFrame() {
+    this.frameKeys = {};
+    this.frameActions = {};
+    this.frameCharKeys = {};
+  },
+
+  wasAnyKeyPressedThisFrame({ ignoreFunctionKeys = false } = {}) {
+    const codes = Object.keys(this.frameKeys);
+    for (const code of codes) {
+      if (!this.frameKeys[code]) continue;
+      if (ignoreFunctionKeys && /^F([1-9]|1[0-9]|2[0-4])$/.test(String(code || ""))) continue;
+      return true;
+    }
+    return false;
+  },
+
+  _nowMs() {
+    try {
+      if (typeof performance !== "undefined" && typeof performance.now === "function") {
+        return performance.now();
+      }
+    } catch {}
+    return Date.now();
+  },
+
+  _shouldRepeatActionNow(action) {
+    if (!REPEATABLE_ACTIONS.has(action)) return false;
+    if (!this.physicalActions[action]) return false;
+
+    const now = this._nowMs();
+
+    if (!Number.isFinite(this.actionDownAtMs[action])) {
+      this.actionDownAtMs[action] = now;
+      this.actionNextRepeatAtMs[action] = now + ACTION_REPEAT_INITIAL_DELAY_MS;
+      return false;
+    }
+
+    if (!Number.isFinite(this.actionNextRepeatAtMs[action])) {
+      this.actionNextRepeatAtMs[action] = this.actionDownAtMs[action] + ACTION_REPEAT_INITIAL_DELAY_MS;
+      return false;
+    }
+
+    if (now < this.actionNextRepeatAtMs[action]) return false;
+
+    this.actionNextRepeatAtMs[action] = now + ACTION_REPEAT_INTERVAL_MS;
+    return true;
   }
 };

@@ -20,7 +20,11 @@ function clamp(n, a, b) {
 }
 
 function normalizeQuery(q) {
-  return String(q || "").trim();
+  return String(q || "");
+}
+
+function normalizeQueryForCompare(q) {
+  return String(q || "").trim().toLowerCase();
 }
 
 function isPrintableKey(e) {
@@ -174,7 +178,9 @@ export function ensureSearchState(state) {
       pickedBaseIndex: -1,
       dropdownBox: null,
       mode: "local",
-      tmdbApiKey: ""
+      tmdbApiKey: "",
+      pickedSuggestion: null,
+      scrollOffset: 0
     };
   } else {
     if (!Array.isArray(state.search.queue)) state.search.queue = [];
@@ -187,6 +193,8 @@ export function ensureSearchState(state) {
     if (typeof state.search.dropdownBox !== "object") state.search.dropdownBox = null;
     if (typeof state.search.mode !== "string") state.search.mode = "local";
     if (typeof state.search.tmdbApiKey !== "string") state.search.tmdbApiKey = "";
+    if (!state.search.pickedSuggestion || typeof state.search.pickedSuggestion !== "object") state.search.pickedSuggestion = null;
+    if (!Number.isFinite(Number(state.search.scrollOffset))) state.search.scrollOffset = 0;
   }
 
   ensureSearchControllerState(state);
@@ -210,6 +218,21 @@ export function enterPickSlotMode(state, baseMovieIndex) {
   state.search.suggestions = [];
   state.search.selectedSuggestion = 0;
   state.search.dropdownBox = null;
+  state.search.scrollOffset = 0;
+}
+
+function enterPickSlotModeFromSuggestion(state, suggestion) {
+  ensureSearchState(state);
+  const rawBaseIndex = suggestion?.baseIndex;
+  const hasExplicitBaseIndex = rawBaseIndex !== null && rawBaseIndex !== undefined && rawBaseIndex !== "";
+  state.search.pickSlotMode = true;
+  state.search.hoveredSlotIndex = -1;
+  state.search.pickedBaseIndex =
+    hasExplicitBaseIndex && Number.isFinite(Number(rawBaseIndex)) ? Number(rawBaseIndex) : -1;
+  state.search.pickedSuggestion = suggestion && typeof suggestion === "object" ? suggestion : null;
+  state.search.suggestions = [];
+  state.search.selectedSuggestion = 0;
+  state.search.dropdownBox = null;
 }
 
 export function exitPickSlotMode(state) {
@@ -217,9 +240,11 @@ export function exitPickSlotMode(state) {
   state.search.pickSlotMode = false;
   state.search.hoveredSlotIndex = -1;
   state.search.pickedBaseIndex = -1;
+  state.search.pickedSuggestion = null;
   state.search.suggestions = [];
   state.search.selectedSuggestion = 0;
   state.search.dropdownBox = null;
+  state.search.scrollOffset = 0;
 }
 
 export function closeSearchDropdown(state) {
@@ -227,80 +252,43 @@ export function closeSearchDropdown(state) {
   state.search.suggestions = [];
   state.search.selectedSuggestion = 0;
   state.search.dropdownBox = null;
+  state.search.scrollOffset = 0;
+}
+
+function visibleRowsForDropdown(L) {
+  return Math.max(1, num(L?.search?.dropdownMaxRows, 6));
+}
+
+function clampScrollForSuggestions(state, opts = {}) {
+  ensureSearchState(state);
+  const total = (state.search.suggestions || []).length;
+  const rows = visibleRowsForDropdown(opts.L);
+  const maxOffset = Math.max(0, total - rows);
+  state.search.scrollOffset = clamp(Number(state.search.scrollOffset || 0), 0, maxOffset);
+}
+
+function keepSelectionInView(state, opts = {}) {
+  ensureSearchState(state);
+  const total = (state.search.suggestions || []).length;
+  if (!total) {
+    state.search.selectedSuggestion = 0;
+    state.search.scrollOffset = 0;
+    return;
+  }
+  state.search.selectedSuggestion = clamp(Number(state.search.selectedSuggestion || 0), 0, total - 1);
+  const rows = visibleRowsForDropdown(opts.L);
+  let offset = Number(state.search.scrollOffset || 0);
+  if (state.search.selectedSuggestion < offset) offset = state.search.selectedSuggestion;
+  if (state.search.selectedSuggestion > offset + rows - 1) offset = state.search.selectedSuggestion - rows + 1;
+  state.search.scrollOffset = Math.max(0, offset);
+  clampScrollForSuggestions(state, opts);
 }
 
 export function bindSearchKeyboard(Input, state) {
   ensureSearchState(state);
   if (state.search.bound) return;
   state.search.bound = true;
-
-  window.addEventListener(
-    "keydown",
-    (e) => {
-      if (!state) return;
-      ensureSearchState(state);
-
-      const focusIsSearch = state.focus === "search";
-      const dropdownOpen = (state.search.suggestions || []).length > 0;
-      const pickMode = !!state.search.pickSlotMode;
-      if (!focusIsSearch && !dropdownOpen && !pickMode) return;
-
-      if (isEscape(e)) {
-        state.search.queue.push({ type: "escape" });
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
-
-      if (isBackspace(e)) {
-        state.search.queue.push({ type: "backspace" });
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
-
-      if (isEnter(e)) {
-        state.search.queue.push({ type: "enter" });
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
-
-      if (isArrowUp(e)) {
-        state.search.queue.push({ type: "move", dir: -1 });
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
-
-      if (isArrowDown(e)) {
-        state.search.queue.push({ type: "move", dir: +1 });
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
-
-      if (isArrowLeft(e) || isArrowRight(e)) {
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
-
-      if (e?.key === " " || e?.code === "Space") {
-        state.search.queue.push({ type: "space" });
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
-
-      if (isPrintableKey(e)) {
-        state.search.queue.push({ type: "char", ch: e.key });
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    },
-    { passive: false }
-  );
+  state.search.inputRef = Input || null;
 }
 
 export function updateSearchFromQueue(state, baseVisible, opts = {}) {
@@ -308,6 +296,49 @@ export function updateSearchFromQueue(state, baseVisible, opts = {}) {
   if (!Array.isArray(baseVisible)) baseVisible = [];
 
   const focusIsSearch = state.focus === "search";
+  const dropdownOpen = (state.search.suggestions || []).length > 0;
+  const pickMode = !!state.search.pickSlotMode;
+  const searchInputActive = focusIsSearch || dropdownOpen || pickMode;
+
+  const Input = state.search.inputRef || opts.Input || null;
+  if (Input && searchInputActive) {
+    const activeEl = (typeof document !== "undefined") ? document.activeElement : null;
+    const usingTextBridge = !!(activeEl && activeEl.dataset && activeEl.dataset.selectTextInputBridge === "1");
+
+    if (Input.pressedCode?.("Escape")) {
+      Input.consumeCode?.("Escape");
+      state.search.queue.push({ type: "escape" });
+    }
+    if (!usingTextBridge && Input.pressedCode?.("Backspace")) {
+      Input.consumeCode?.("Backspace");
+      state.search.queue.push({ type: "backspace" });
+    }
+    if (Input.pressedCode?.("Enter")) {
+      Input.consumeCode?.("Enter");
+      state.search.queue.push({ type: "enter" });
+    }
+    if (Input.pressedCode?.("ArrowUp")) {
+      Input.consumeCode?.("ArrowUp");
+      state.search.queue.push({ type: "move", dir: -1 });
+    }
+    if (Input.pressedCode?.("ArrowDown")) {
+      Input.consumeCode?.("ArrowDown");
+      state.search.queue.push({ type: "move", dir: +1 });
+    }
+    if (!usingTextBridge && Input.pressedCode?.("Space")) {
+      Input.consumeCode?.("Space");
+      state.search.queue.push({ type: "space" });
+    }
+
+    if (!usingTextBridge) {
+      for (;;) {
+        const ch = Input.popTypedChar?.();
+        if (!ch) break;
+        state.search.queue.push({ type: "char", ch });
+      }
+    }
+  }
+
   if (!focusIsSearch) {
     state.search.queue = [];
     closeSearchDropdown(state);
@@ -327,7 +358,7 @@ export function updateSearchFromQueue(state, baseVisible, opts = {}) {
       } else if (ev.type === "backspace") {
         q = q.length ? q.slice(0, -1) : q;
       } else if (ev.type === "space") {
-        // swallow
+        q = q + " ";
       } else if (ev.type === "escape") {
         state.search.queue = [];
 
@@ -341,9 +372,7 @@ export function updateSearchFromQueue(state, baseVisible, opts = {}) {
         if (s.length) {
           const idx = clamp(state.search.selectedSuggestion || 0, 0, s.length - 1);
           const chosen = s[idx];
-          if (chosen && Number.isFinite(chosen.baseIndex) && Number(chosen.baseIndex) >= 0) {
-            enterPickSlotMode(state, Number(chosen.baseIndex));
-          }
+          if (chosen) enterPickSlotModeFromSuggestion(state, chosen);
         }
       } else if (ev.type === "move") {
         const s = state.search.suggestions || [];
@@ -354,6 +383,7 @@ export function updateSearchFromQueue(state, baseVisible, opts = {}) {
             0,
             s.length - 1
           );
+          keepSelectionInView(state, opts);
         }
       }
     }
@@ -364,22 +394,23 @@ export function updateSearchFromQueue(state, baseVisible, opts = {}) {
 
   if (state.search.pickSlotMode) {
     closeSearchDropdown(state);
-  } else if (!q) {
+  } else if (!q.trim()) {
     closeSearchDropdown(state);
   } else {
     if (q !== q0) {
       state.search.suggestions = [];
       state.search.selectedSuggestion = 0;
+      state.search.scrollOffset = 0;
     }
 
     requestSuggestions(state, {
-      query: q,
+      query: q.trim(),
       baseVisible,
-      limit: 6,
+      limit: 30,
       onResults: (results) => {
         ensureSearchState(state);
         if (state.search.pickSlotMode) return;
-        if (normalizeQuery(state.searchQuery) !== normalizeQuery(q)) return;
+        if (normalizeQueryForCompare(state.searchQuery) !== normalizeQueryForCompare(q)) return;
 
         state.search.suggestions = Array.isArray(results) ? results : [];
         state.search.selectedSuggestion = clamp(
@@ -387,6 +418,7 @@ export function updateSearchFromQueue(state, baseVisible, opts = {}) {
           0,
           Math.max(0, state.search.suggestions.length - 1)
         );
+        keepSelectionInView(state, opts);
       }
     });
   }
@@ -418,9 +450,28 @@ export function handleSearchHover({ mouse, state, SCREEN, L }) {
   const mx = mouse.x;
   const my = mouse.y;
 
+  if (pointInRect(mx, my, dd.box) && Number.isFinite(Number(mouse.wheelY)) && mouse.wheelY !== 0) {
+    const dir = mouse.wheelY > 0 ? +1 : -1;
+    state.search.scrollOffset = Number(state.search.scrollOffset || 0) + dir;
+    clampScrollForSuggestions(state, { L });
+    const rows = visibleRowsForDropdown(L);
+    const maxVisibleIdx = Math.max(0, Math.min(sugg.length - 1, state.search.scrollOffset + rows - 1));
+    state.search.selectedSuggestion = clamp(
+      Number(state.search.selectedSuggestion || state.search.scrollOffset),
+      state.search.scrollOffset,
+      maxVisibleIdx
+    );
+    return true;
+  }
+
   if (pointInRect(mx, my, dd.box)) {
     const relY = my - dd.box.y - dd.pad;
-    const idx = clamp(Math.floor(relY / dd.rowH), 0, Math.max(0, dd.rows - 1));
+    const row = clamp(Math.floor(relY / dd.rowH), 0, Math.max(0, dd.rows - 1));
+    const idx = clamp(
+      Number(state.search.scrollOffset || 0) + row,
+      0,
+      Math.max(0, sugg.length - 1)
+    );
     if (Number.isFinite(idx)) state.search.selectedSuggestion = idx;
     return true;
   }
@@ -460,9 +511,14 @@ export function handleSearchPointer({
 
     if (clickedSlot >= 0) {
       const bi = state.search.pickedBaseIndex;
+      const pickedSuggestion = state.search.pickedSuggestion;
       if (Number.isFinite(bi) && bi >= 0 && bi < baseVisible.length) {
         try {
-          onPlaceMovie(clickedSlot, bi);
+          onPlaceMovie(clickedSlot, bi, pickedSuggestion);
+        } catch {}
+      } else if (pickedSuggestion) {
+        try {
+          onPlaceMovie(clickedSlot, -1, pickedSuggestion);
         } catch {}
       }
       exitPickSlotMode(state);
@@ -502,15 +558,20 @@ export function handleSearchPointer({
 
     if (pointInRectExternal(mx, my, dd.box)) {
       const relY = my - dd.box.y - dd.pad;
-      const idx = clamp(Math.floor(relY / dd.rowH), 0, Math.max(0, dd.rows - 1));
+      const row = clamp(Math.floor(relY / dd.rowH), 0, Math.max(0, dd.rows - 1));
+      const idx = clamp(
+        Number(state.search.scrollOffset || 0) + row,
+        0,
+        Math.max(0, sugg.length - 1)
+      );
       state.search.selectedSuggestion = idx;
 
       const chosen = sugg[idx];
-      if (chosen && Number.isFinite(chosen.baseIndex) && Number(chosen.baseIndex) >= 0) {
+      if (chosen) {
         try {
-          onEnterPickMode(chosen.baseIndex);
+          onEnterPickMode(chosen);
         } catch {}
-        enterPickSlotMode(state, chosen.baseIndex);
+        enterPickSlotModeFromSuggestion(state, chosen);
         try {
           persist();
         } catch {}
@@ -561,6 +622,9 @@ export function renderSearchDropdown(ctx, {
 
   const rowH = dd.rowH;
   const pad = dd.pad;
+  clampScrollForSuggestions(state, { L });
+  keepSelectionInView(state, { L });
+  const start = Number(state.search.scrollOffset || 0);
 
   const posterW = num(L?.search?.dropdownPosterW, 20);
   const posterH = num(L?.search?.dropdownPosterH, 28);
@@ -576,19 +640,22 @@ export function renderSearchDropdown(ctx, {
   const lineGap = num(L?.search?.dropdownLineGap, 10);
 
   for (let i = 0; i < dd.rows; i++) {
+    const sugIdx = start + i;
+    if (sugIdx >= sugg.length) break;
     const rowY = dd.box.y + pad + i * rowH;
 
-    const isSel = i === (state.search.selectedSuggestion || 0);
+    const isSel = sugIdx === (state.search.selectedSuggestion || 0);
     if (isSel) {
       ctx.strokeStyle = colors.highlight || "#ff0";
       ctx.strokeRect(dd.box.x + 1, rowY + 1, dd.box.w - 2, rowH - 2);
     }
 
-    const { movie } = sugg[i];
+    const { movie } = sugg[sugIdx];
     const title = String(movie?.title || "Unknown");
     const year = getYear(movie, movieMeta);
 
-    const posterPath = getLocalPosterPath(movie);
+    const remotePoster = String(movie?.posterUrl || "").trim();
+    const posterPath = remotePoster || getLocalPosterPath(movie);
     const px = dd.box.x + pad;
     const py = rowY + Math.floor((rowH - posterH) / 2);
 

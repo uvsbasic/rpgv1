@@ -46,8 +46,11 @@ function measure(ctx, s) {
 }
 
 function getLocalPosterPath(movie) {
+  const remote = String(movie?.posterUrl || "").trim();
+  if (remote) return remote;
   const id = movie?.id ? String(movie.id) : "";
   if (!id) return null;
+  if (id.startsWith("tmdb_")) return null;
   return `frontend/assets/posters/${id}.jpg`;
 }
 

@@ -7,7 +7,9 @@ import { enemies } from "../data/enemies.js";
 
 function levelMultiplier(level = 1) {
   const L = Math.max(1, Number(level) || 1);
-  return 1 + (L - 1) * 0.35;
+  if (L <= 10) return 1 + (L - 1) * 0.35;
+  if (L <= 15) return 1 + (10 - 1) * 0.35 + (L - 10) * 0.45;
+  return 1 + (10 - 1) * 0.35 + (15 - 10) * 0.45 + (L - 15) * 0.5;
 }
 
 function roundStat(n) {

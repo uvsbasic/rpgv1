@@ -4,20 +4,28 @@ import { GameState, changeScreen } from "../game.js";
 import { SCREEN, LEGACY_320, INTRO_LAYOUT } from "../layout.js";
 import { Input } from "../ui.js";
 import { enemies } from "../data/enemies.js";
-import { movies } from "../data/movies.js"; // ✅ needed for Dev preset party resolution
+import { movies } from "../data/movies.js"; // needed for Dev preset party resolution
+import { ensureStatsState } from "../systems/statsSystem.js";
 import { playUIConfirmBlip } from "../sfx/uiSfx.js";
 
 // ID-based pools
 const levelEnemyPools = {
   1: ["disney_adult", "brain_rot", "old_head", "critic"],
   2: ["film_bro", "brain_rot", "comfort", "recent", "buster"],
-  3: ["film_bro", "nolan_fan", "star_fan", "psych", "recent", "folk_horror", "critic"],
-  4: ["film_bro", "goth_chick", "comfort", "old_head", "buster", "folk_horror", "critic"],
+  3: ["disney_adult", "film_bro", "nolan_fan", "star_fan", "psych", "recent", "folk_horror", "critic"],
+  4: ["disney_adult", "film_bro", "goth_chick", "comfort", "old_head", "buster", "folk_horror", "critic"],
   5: ["film_bro", "critic", "franchise_fan", "star_fan", "psych", "buster", "nolan_fan", "light"],
-  6: ["film_bro", "franchise_fan", "art_snob", "horror_purist", "light"],
-  7: ["art_snob", "cinephile", "comfort", "old_head", "psych", "nolan_fan", "horror_purist", "folk_horror", "light"],
-  8: ["cinephile", "brain_rot", "old_head", "nolan_fan", "light"],
-  9: ["cinephile", "troll", "unironic_rot"]
+  6: ["film_bro", "critic", "franchise_fan", "star_fan", "psych", "buster", "nolan_fan", "light"], 
+  7: ["film_bro", "goth_chick", "franchise_fan", "art_snob", "horror_purist", "light"],
+  8: ["art_snob", "film_bro", "goth_chick", "franchise_fan", "horror_purist", "old_head"],
+  9: ["art_snob", "film_bro", "cinephile", "comfort", "old_head", "psych", "nolan_fan", "horror_purist", "folk_horror", "light"],
+ 10: ["art_snob", "cinephile", "goth_chick", "comfort", "old_head", "psych", "nolan_fan", "horror_purist", "folk_horror"],
+ 11: ["art_snob", "comfort", "old_head", "psych", "nolan_fan", "horror_purist", "folk_horror", "light"],
+ 12: ["art_snob", "cinephile", "comfort", "old_head", "psych", "nolan_fan", "horror_purist", "folk_horror", "light"],
+ 13: ["art_snob", "cinephile", "old_head", "nolan_fan",  "horror_purist", "folk_horror", "light"],
+ 14: ["cinephile", "brain_rot", "nolan_fan", "folk_horror", "light"],
+ 15: ["cinephile", "troll", "unironic_rot"],
+ 16: ["film_professor"]
 };
 
 function findEnemyById(id) {
@@ -25,13 +33,32 @@ function findEnemyById(id) {
 }
 
 function pickEnemyForLevel(level) {
-  const pool = levelEnemyPools[level];
-  const ids = pool && pool.length ? pool : enemies.map((e) => e.id);
+  ensureStatsState(GameState);
+  const completions = Math.max(0, Math.floor(Number(GameState?.stats?.campaignCompletions || 0)));
+  const requestedLevel = Number(level || 1);
+  // Mirror campaign max-level rule: level 16 allowed only on the 4th run window (completions === 3).
+  const allowLevel16 = completions === 3;
+  const effectiveLevel = requestedLevel === 16 && !allowLevel16 ? 15 : requestedLevel;
 
-  const chosenId = ids[Math.floor(Math.random() * ids.length)];
+  const pool = levelEnemyPools[effectiveLevel];
+  const ids = pool && pool.length ? pool : enemies.map((e) => e.id);
+  const uniqueIds = Array.from(new Set(ids));
+  const lastEnemyId = String(GameState?.campaign?.lastEnemyId || "");
+
+  let chosenId = ids[Math.floor(Math.random() * ids.length)];
+  if (uniqueIds.length > 1 && chosenId === lastEnemyId) {
+    // Avoid back-to-back duplicate enemies when we have alternatives.
+    let guard = 12;
+    while (chosenId === lastEnemyId && guard-- > 0) {
+      chosenId = ids[Math.floor(Math.random() * ids.length)];
+    }
+  }
   const template = findEnemyById(chosenId);
 
   GameState.enemyTemplate = template;
+  if (GameState.campaign) {
+    GameState.campaign.lastEnemyId = template?.id || null;
+  }
   GameState.enemy = null; // ensure battle spawns fresh
 }
 
@@ -42,6 +69,7 @@ function ensureCampaignState() {
     onefourShown: false,
     firstPickApplied: null,
     fourthPickApplied: null,
+    lastEnemyId: null,
     effects: { first: null, fourth: null },
     _onefourAppliedThisBattle: false
   };
@@ -199,6 +227,7 @@ export const LevelIntroScreen = {
     ctx.restore();
   }
 };
+
 
 
 

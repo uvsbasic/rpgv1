@@ -18,48 +18,6 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath, pathToFileURL } from "url";
 
-const OVERRIDES = {
-  // ✅ EXACT posters (direct URLs you chose)
-  rear_window: {
-    tmdbId: 567, // Rear Window (1954)
-  },
-
-  harry_potter_2001: {
-    tmdbId: 671, // Harry Potter and the Philosopher's Stone (2001)
-  },
-
-  love_and_mercy: {
-    tmdbId: 271714, // Love & Mercy (2014)
-  },
-
-  steve_jobs_2015: {
-    tmdbId: 321697, // Steve Jobs (2015)
-  },
-  howls_moving_castle: {
-    directPosterUrl: "https://image.tmdb.org/t/p/original/jVuYH2SS9GfJhmW40spJ03mZ15l.jpg",
-  },
-  raging_bull: {
-    directPosterUrl: "https://image.tmdb.org/t/p/original/wpfpnVUVy6kElwz1Z6p5QiCpbwB.jpg",
-  },
-  ten_things_i_hate_about_you: {
-    directPosterUrl: "https://image.tmdb.org/t/p/original/u3jyD55Tdbj4hCgDhvRyOK9nFsH.jpg",
-  },
-  this_is_spinal_tap: {
-  directPosterUrl: "https://image.tmdb.org/t/p/original/lTdoAGlVvIn3W1ZVa8iX4Sh2SCq.jpg",
-},
-  rushmore: {
-    directPosterUrl: "https://image.tmdb.org/t/p/original/5BpHFugpgiNg68FXSqc4EJRfOuE.jpg",
-  },
-  eight_half: {
-    directPosterUrl: "https://image.tmdb.org/t/p/original/xmdsHc9f2vOsKYh2zTOaI5k4quj.jpg",
-  },
-
-  // ✅ Parasite by TMDB ID (you provided)
-  parasite: {
-    tmdbId: 496243,
-  },
-};
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -67,6 +25,7 @@ const __dirname = path.dirname(__filename);
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
 const POSTER_SIZE = "w342"; // used only for tmdbId/search paths
 const FORCE = process.argv.includes("--force");
+const OVERRIDES = {};
 
 const MOVIES_PATH = path.join(__dirname, "../frontend/js/data/movies.js");
 const POSTERS_DIR = path.join(__dirname, "../frontend/assets/posters");

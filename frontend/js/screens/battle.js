@@ -7,7 +7,15 @@ import { Input } from "../ui.js";
 import { specials } from "../data/specials.js";
 import { items } from "../data/items.js";
 import { movieMeta } from "../data/movieMeta.js";
-import { openingKits } from "../data/starterKits.js";
+import { openingKits, eggKits } from "../data/starterKits.js";
+import {
+  applyCampaignBadgesToParty,
+  ensureCampaignIntermissionState,
+  getAwardById,
+  getBudgetById,
+  grantIntermissionTickets,
+  rollBattleRewards
+} from "../systems/intermissionSystem.js";
 
 import { getAliveParty, getFirstAliveIndex } from "../systems/turnSystem.js";
 import { computePlayerAttack } from "../systems/damageSystem.js";
@@ -24,12 +32,18 @@ import { spawnEnemy } from "../systems/enemySpawnSystem.js";
 
 import {
   ensureStatsState,
+  getCampaignMaxLevel,
+  incStat,
   incWins,
   incLosses,
   setStat,
   recordWinForPartyMovies
 } from "../systems/statsSystem.js";
-import { evaluateUnlockRules } from "../systems/unlockSystem.js";
+import { popNextScreenUnlockEvent, runUnlockTriggers } from "../systems/unlockTriggers.js";
+import { ensureMatineeState, recordCampaignBattleResult } from "../data/matinee/storage.js";
+import { discoverSetsFromRoster } from "../data/matinee/extraDiscovery.js";
+import { evaluateExtraMovieUnlocks } from "../data/matinee/extraSystems.js";
+import { applyMatineeBattleInitEffects, onMatineeRoundStart, onMatineeAttackResolved, onMatineeBattleStart, onMatineeBattleEnd } from "../data/matinee/extraEffects.js";
 
 import {
   getResolvedSpecialsForActor,
@@ -104,7 +118,7 @@ import {
   buildPerkSpecialNoTargetLines
 } from "../battleText/engines/buildPerkSpecialLines.js";
 import {
-  buildEnemyTurnLines,
+  buildEnemyTurnEntries,
   buildEnemyActsFallbackLine,
   buildEnemyStrikesFallbackLine,
   buildPartyFallenLine,
@@ -655,16 +669,61 @@ function getProgressMap() {
   return GameState.party.progress;
 }
 
+function getCampaignPersistenceMultipliers(actor) {
+  const out = { atk: 1, def: 1, maxHp: 1 };
+  if (!state.battleIsCampaign || !actor?.movie?.id) return out;
+
+  const movieId = String(actor.movie.id || "");
+  const campaign = GameState?.campaign || null;
+  if (!campaign) return out;
+
+  const mulFromMods = (mods) => {
+    if (!mods || typeof mods !== "object") return;
+    if (Number.isFinite(Number(mods.atkPct))) out.atk *= (1 + Number(mods.atkPct));
+    if (Number.isFinite(Number(mods.defPct))) out.def *= (1 + Number(mods.defPct));
+    if (Number.isFinite(Number(mods.hpPct))) out.maxHp *= (1 + Number(mods.hpPct));
+  };
+
+  const awardId = campaign?.badges?.awards?.[movieId];
+  const budgetId = campaign?.badges?.budgets?.[movieId];
+  mulFromMods(getAwardById(awardId));
+  mulFromMods(getBudgetById(budgetId));
+
+  const first = campaign?.effects?.first || null;
+  if (first) {
+    mulFromMods(first.teamModsStat);
+    if (String(first.movieId || "") === movieId) {
+      mulFromMods(first.selfModsStat);
+    }
+  }
+
+  const fourth = campaign?.effects?.fourth || null;
+  if (fourth) {
+    mulFromMods(fourth.teamModsStatA);
+    mulFromMods(fourth.teamModsStatB);
+  }
+
+  return out;
+}
+
 function saveProgressForActor(actor) {
   if (!actor || !actor.movie || !actor.movie.id) return;
   const progress = getProgressMap();
+  const mul = getCampaignPersistenceMultipliers(actor);
+
+  const safeDivRound = (value, factor) => {
+    const v = Number(value || 0);
+    const f = Number(factor || 1);
+    if (!Number.isFinite(v) || !Number.isFinite(f) || f <= 0) return Math.max(1, Math.round(v || 1));
+    return Math.max(1, Math.round(v / f));
+  };
 
   progress[actor.movie.id] = {
     level: actor.level || 1,
     xp: actor.xp || 0,
-    maxHp: actor.maxHp,
-    atk: actor.atk,
-    def: actor.def,
+    maxHp: safeDivRound(actor.maxHp, mul.maxHp),
+    atk: safeDivRound(actor.atk, mul.atk),
+    def: safeDivRound(actor.def, mul.def),
     perks: actor.perks || { blockbusterPower: 0, cultClassic: 0, sleeperHit: 0 }
   };
 }
@@ -738,12 +797,22 @@ function normalizeInventoryEntries(entries) {
 }
 
 function getCampaignOpeningKitInventory() {
+  ensureCampaignIntermissionState(GameState);
+  const campaignInv = normalizeInventoryEntries(GameState?.campaign?.inventory || []);
+  if (campaignInv.length > 0) return campaignInv;
+
   const selectedId = String(GameState?.campaign?.openingKitSelectedId || "");
   if (!selectedId) return [];
-  const selected = Array.isArray(openingKits)
-    ? openingKits.find((k) => String(k?.id || "") === selectedId)
+  const allStarterKits = [
+    ...(Array.isArray(openingKits) ? openingKits : []),
+    ...(Array.isArray(eggKits) ? eggKits : [])
+  ];
+  const selected = Array.isArray(allStarterKits)
+    ? allStarterKits.find((k) => String(k?.id || "") === selectedId)
     : null;
-  return normalizeInventoryEntries(selected?.items);
+  const normalized = normalizeInventoryEntries(selected?.items);
+  if (normalized.length > 0) GameState.campaign.inventory = normalized;
+  return normalized;
 }
 
 function initInventory() {
@@ -929,6 +998,13 @@ function onActorTurnStart() {
 
 function onPlayerPhaseStart() {
   if (!Array.isArray(state.party) || state.party.length === 0) return;
+  onMatineeRoundStart(GameState);
+  for (let i = 0; i < state.party.length; i++) {
+    if (!isPartyMemberConsciousAtIndex(i)) continue;
+    const actor = state.party[i];
+    if (!actor) continue;
+    onMatineeAttackResolved(GameState, { phase: "round_start", actor, party: state.party });
+  }
 
   tickItemCooldownsForActor();
   const phaseTickLines = [];
@@ -1287,23 +1363,51 @@ function restoreActorPerkState(actor, snapshot) {
 
 function continueVictoryFlow() {
   ensureStatsState(GameState);
+  ensureMatineeState(GameState);
 
   const isQuickplay = state.battleRunMode === "quickplay";
   const isCampaign = state.battleIsCampaign;
+  const isEggBattle = String(GameState?.specialFlow?.type || "") === "eggBattle";
 
   incWins(GameState, 1);
   recordWinForPartyMovies(GameState, GameState.party.movies);
 
-  const curLevel = GameState.currentLevel || 1;
-  const maxLevel = GameState.maxLevel || 15;
+  const rosterIds = (GameState.party.movies || []).map((m) => String(m?.id || "")).filter(Boolean);
+  const activeArchetypeId = String(GameState?.flags?.activeArchetypeId || "");
+  const discovered = discoverSetsFromRoster(GameState, rosterIds);
+  const activeSetIds = Array.isArray(discovered) && discovered.length
+    ? discovered
+    : (Array.isArray(GameState?.campaign?.activeMatineeSetIds) ? GameState.campaign.activeMatineeSetIds : []);
+  recordCampaignBattleResult(GameState, {
+    won: true,
+    rosterMovieIds: rosterIds,
+    archetypeId: activeArchetypeId,
+    activeSetIds
+  });
 
-  const campaignCleared = isCampaign && curLevel >= maxLevel;
+  const curLevel = GameState.currentLevel || 1;
+  const maxLevel = getCampaignMaxLevel(GameState);
+  GameState.maxLevel = maxLevel;
+  const defeatedEnemyId = String(state.enemy?.id || "");
+
+  // Secret boss flag: unlock rule is evaluated via matinee campaignMeta.
+  if (defeatedEnemyId === "film_professor") {
+    if (!GameState.flags) GameState.flags = {};
+    if (!GameState.flags.secrets) GameState.flags.secrets = {};
+    GameState.flags.secrets.filmProfessorDefeated = true;
+  }
+
+  // Egg-battle shortcut should never count as a true campaign clear.
+  const campaignCleared = isCampaign && !isEggBattle && curLevel >= maxLevel;
   if (campaignCleared) {
     setStat(GameState, "campaignCleared", true);
+    incStat(GameState, "campaignCompletions", 1);
     completeRatatouilleTrialIfActive(GameState);
   }
 
-  evaluateUnlockRules(GameState);
+  runUnlockTriggers(GameState, null);
+  evaluateExtraMovieUnlocks(GameState);
+  onMatineeBattleEnd(GameState, state.party);
 
   battleInitialized = false;
 
@@ -1320,15 +1424,20 @@ function continueVictoryFlow() {
   }
 
   if (isCampaign && curLevel < maxLevel) {
+    ensureCampaignIntermissionState(GameState);
+    GameState.campaign.inventory = normalizeInventoryEntries(state.inventory);
+    grantIntermissionTickets(GameState, curLevel);
+    const rewards = rollBattleRewards(GameState, curLevel);
     GameState.currentLevel = curLevel + 1;
     GameState.enemyTemplate = null;
     pendingLevelIntroGate = false;
     clearOneFourBattleApplyFlag(GameState);
-    changeScreen("levelIntro");
+    changeScreen(rewards.length > 0 ? "battleReward" : "intermission");
   } else {
     GameState.party.progress = {};
     GameState.enemyTemplate = null;
     clearOneFourBattleApplyFlag(GameState);
+    if (campaignCleared && openDeferredCampaignUnlockScreen()) return;
     changeScreen("menu");
   }
 }
@@ -1954,10 +2063,13 @@ function initBattle() {
   state.battleIsCampaign = state.battleRunMode === "campaign" || !!GameState.campaign;
   const progressMap = state.battleIsCampaign ? (GameState.party.progress || {}) : {};
   state.party = buildPartyFromMovies(GameState.party.movies || [], progressMap);
+  if (state.battleIsCampaign) applyCampaignBadgesToParty(GameState, state.party);
 
   clearOneFourBattleApplyFlag(GameState);
   resetOneFourRuntimeForBattle(GameState);
   applyOneFourEffectsToParty(GameState, state.party);
+  applyMatineeBattleInitEffects(GameState, state.party);
+  onMatineeBattleStart(GameState);
 
   state.currentActorIndex = getFirstConsciousPartyIndex();
   if (state.currentActorIndex < 0) state.currentActorIndex = 0;
@@ -2030,6 +2142,10 @@ function advanceToNextActor() {
 // ===== CANCEL =====
 function cancelPressed() {
   return Input.pressed("Backspace");
+}
+
+function autoWinPressed() {
+  return Input.pressed("6");
 }
 
 function getCancelDestination(mode) {
@@ -2194,6 +2310,9 @@ const battleActions = createBattleActions({
         pendingMoveXpDebug[dbg.actorKey] = Number(dbg.debugXp || 0);
       }
     },
+    onActionResolved: (payload) => {
+      onMatineeAttackResolved(GameState, payload);
+    },
     isConfirmHeld: () => !!(Input?.isPhysicallyDown?.("Confirm") || Input?.isPhysicallyDown?.("Enter")),
     onPrepareLevelUpRoll: (summary) => {
       prepareLevelUpRoll(summary);
@@ -2261,12 +2380,19 @@ function enemyAttack() {
     recordBattleAction(state.enemy, "ATTACK", "Enemy Turn");
   }
 
-  const enemyEntries = (result?.events || []).map((evt) => {
-    const line = (buildEnemyTurnLines({ events: [evt] }) || [])[0];
+  const enemyEntries = (result?.events || []).flatMap((evt) => {
+    const turnEntries = buildEnemyTurnEntries({ events: [evt] }) || [];
+    const fallbackLine =
+      evt?.type === "enemyAttackHit"
+        ? buildEnemyStrikesFallbackLine()
+        : buildEnemyActsFallbackLine();
 
     if (evt?.type === "enemyAttackHit") {
-      return {
-        onStart: () => {
+      const effectIdx = Math.max(
+        0,
+        turnEntries.findIndex((e) => !!e?.effectLine)
+      );
+      const applyHitEffect = () => {
           const idx = Number(evt.targetIndex);
           if (!Number.isFinite(idx) || idx < 0 || idx >= state.party.length) return;
 
@@ -2311,12 +2437,28 @@ function enemyAttack() {
             allyDowned: !!evt.isMortal,
             guardedCrit: !!evt.guarded && !!evt.isCrit
           });
-        },
-        text: line || buildEnemyStrikesFallbackLine()
+          onMatineeAttackResolved(GameState, {
+            phase: "enemy_attack",
+            kind: "enemy",
+            actor: target,
+            target: state.enemy,
+            damage: Number(evt.damage || 0),
+            party: state.party
+          });
       };
+
+      if (turnEntries.length === 0) {
+        return [{ text: fallbackLine, onStart: applyHitEffect }];
+      }
+
+      return turnEntries.map((entry, i) => ({
+        text: entry?.text || fallbackLine,
+        onStart: i === effectIdx ? applyHitEffect : undefined
+      }));
     }
 
-    return { text: line || buildEnemyActsFallbackLine() };
+    if (turnEntries.length === 0) return [{ text: fallbackLine }];
+    return turnEntries.map((entry) => ({ text: entry?.text || fallbackLine }));
   });
 
   // Tick enemy statuses AFTER the enemy acts/skips, so 1-turn effects
@@ -2386,6 +2528,7 @@ function enemyAttack() {
 
 function handleDefeatReturnToMenu() {
   ensureStatsState(GameState);
+  ensureMatineeState(GameState);
 
   const isQuickplay = GameState.runMode === "quickplay";
   if (isQuickplay) GameState.runMode = null;
@@ -2393,8 +2536,20 @@ function handleDefeatReturnToMenu() {
   completeRatatouilleTrialIfActive(GameState);
 
   if (state.defeatReason !== "RUN") incLosses(GameState, 1);
+  if (GameState.runMode === "campaign") {
+    const rosterIds = (GameState.party.movies || []).map((m) => String(m?.id || "")).filter(Boolean);
+    const activeArchetypeId = String(GameState?.flags?.activeArchetypeId || "");
+    recordCampaignBattleResult(GameState, {
+      won: false,
+      rosterMovieIds: rosterIds,
+      archetypeId: activeArchetypeId,
+      activeSetIds: Array.isArray(GameState?.campaign?.activeMatineeSetIds) ? GameState.campaign.activeMatineeSetIds : []
+    });
+    evaluateExtraMovieUnlocks(GameState);
+  }
 
-  evaluateUnlockRules(GameState);
+  runUnlockTriggers(GameState, null);
+  onMatineeBattleEnd(GameState, state.party);
 
   GameState.campaign = null;
   GameState.party.movies = [null, null, null, null];
@@ -2407,7 +2562,18 @@ function handleDefeatReturnToMenu() {
   state.enemy = null;
 
   clearOneFourBattleApplyFlag(GameState);
+  if (openDeferredCampaignUnlockScreen()) return;
   changeScreen("menu");
+}
+
+function openDeferredCampaignUnlockScreen() {
+  const payload = popNextScreenUnlockEvent(GameState);
+  if (!payload) return false;
+
+  if (!GameState.ui || typeof GameState.ui !== "object") GameState.ui = {};
+  GameState.ui.campaignUnlockScreenPayload = payload;
+  changeScreen("campaignUnlock");
+  return true;
 }
 const BattleScreenObj = {
   update(mouse) {
@@ -2485,6 +2651,16 @@ const BattleScreenObj = {
 
     if (state.phase === "victory" || state.phase === "defeat") {
       stopBattleBgm();
+    }
+
+    if (
+      (state.phase === "player" || state.phase === "enemy") &&
+      autoWinPressed() &&
+      typeof battleActions?.triggerAutoWinFatalBlow === "function"
+    ) {
+      Input.consume("6");
+      battleActions.triggerAutoWinFatalBlow();
+      return;
     }
 
     // VICTORY

@@ -10,6 +10,7 @@ import { imdbMultiplier } from "./imdbScaling.js";
 import { PLAYER_ATK_MULT } from "./damageSystem.js";
 import { genreSpecials } from "../data/genreSpecials.js";
 import { getAllSignatureSpecials } from "../data/specials.js";
+import { getBonusSpecialsForMovieId } from "../data/matinee/bonusSpecialsLoadout.js";
 
 import { normalizeTargetTags as normalizeTags, getBaseTargetFromTags } from "./specialTags.js";
 
@@ -452,9 +453,9 @@ function getSignatureDefsForMovie(movieId, signatureMap) {
   if (override && typeof override === "object" && override.id) return [override];
 
   const fromHelper = typeof getAllSignatureSpecials === "function" ? getAllSignatureSpecials(movieId) : null;
-  if (Array.isArray(fromHelper) && fromHelper.length) return fromHelper;
-
-  return [];
+  const base = Array.isArray(fromHelper) ? fromHelper : [];
+  const bonus = getBonusSpecialsForMovieId(movieId);
+  return [...base, ...bonus];
 }
 
 export function getSpecialsForActor(actor, movieMetaMap, signatureMap) {
@@ -470,8 +471,19 @@ export function getSpecialsForActor(actor, movieMetaMap, signatureMap) {
     if (sig) list.push(sig);
   }
 
-  const pg = meta?.primaryGenre || null;
-  const sg = meta?.secondaryGenre || null;
+  const pg = String(
+    meta?.primaryGenre ||
+    actor?.primaryGenre ||
+    actor?.movie?.primaryGenre ||
+    ""
+  ).trim().toUpperCase() || null;
+  const sgRaw = String(
+    meta?.secondaryGenre ||
+    actor?.secondaryGenre ||
+    actor?.movie?.secondaryGenre ||
+    ""
+  ).trim().toUpperCase() || null;
+  const sg = sgRaw && sgRaw !== pg ? sgRaw : null;
 
   if (pg) {
     const g1 = buildGenreSpecial(pg, "primary");

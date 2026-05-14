@@ -32,6 +32,7 @@ function ensureInputEl() {
   el.spellcheck = false;
   el.inputMode = "search";
   el.enterKeyHint = "search";
+  el.dataset.selectTextInputBridge = "1";
 
   // visually hidden but focusable; we will position it over the search bar
   el.style.position = "fixed";

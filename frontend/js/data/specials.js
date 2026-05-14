@@ -253,6 +253,15 @@ export const specials = {
     amount: 45,
     cooldownTurns: 3
   },
+  "2001": {
+    id: "star_gate",
+    name: "Star Gate",
+    description: "A cosmic surge crashes into the enemy.",
+    kind: "damageEnemy",
+    target: "enemy",
+    powerMultiplier: 1.9,
+    cooldownTurns: 3
+  },
   the_matrix: {
     id: "bullet_time",
     name: "Bullet Time",
@@ -269,6 +278,15 @@ export const specials = {
     kind: "damageEnemy",
     target: "enemy",
     powerMultiplier: 1.9,
+    cooldownTurns: 3
+  },
+  dune_1984: {
+    id: "weirding_way",
+    name: "Weirding Way",
+    description: "A focused sonic strike batters the enemy.",
+    kind: "damageEnemy",
+    target: "enemy",
+    powerMultiplier: 1.8,
     cooldownTurns: 3
   },
   blade_runner_2049: {
@@ -392,6 +410,24 @@ export const specials = {
     kind: "healSelf",
     target: "self",
     amount: 40,
+    cooldownTurns: 3
+  },
+  field_of_dreams: {
+    id: "if_you_build_it",
+    name: "If You Build It",
+    description: "A hopeful vision restores your strength.",
+    kind: "healSelf",
+    target: "self",
+    amount: 42,
+    cooldownTurns: 3
+  },
+  do_the_right_thing: {
+    id: "bed_stuy_heatwave",
+    name: "Bed-Stuy Heatwave",
+    description: "Pressure boils over into a fierce attack.",
+    kind: "damageEnemy",
+    target: "enemy",
+    powerMultiplier: 1.85,
     cooldownTurns: 3
   },
   truman_show: {
@@ -1193,6 +1229,33 @@ export const specials = {
     kind: "healSelf",
     target: "self",
     amount: 55, // stronger (single-genre)
+    cooldownTurns: 3
+  },
+  mystery_train: {
+    id: "night_shift_tracks",
+    name: "Night Shift Tracks",
+    description: "A dead-of-night riff rattles the enemy.",
+    kind: "damageEnemy",
+    target: "enemy",
+    powerMultiplier: 1.8,
+    cooldownTurns: 3
+  },
+  wings_of_desire: {
+    id: "angels_whisper",
+    name: "Angel's Whisper",
+    description: "A quiet blessing restores an ally's health.",
+    kind: "healAlly",
+    target: "ally",
+    amount: 44,
+    cooldownTurns: 3
+  },
+  mandy_2018: {
+    id: "crimson_forge",
+    name: "Crimson Forge",
+    description: "A vengeful strike crashes into the enemy.",
+    kind: "damageEnemy",
+    target: "enemy",
+    powerMultiplier: 1.95,
     cooldownTurns: 3
   },
   // ✅ Office Space: new "pages" shape, but each move uses the SAME schema your system already supports.
