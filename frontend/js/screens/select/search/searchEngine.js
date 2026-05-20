@@ -6,8 +6,8 @@
 import {
   ensureSearchControllerState,
   requestSuggestions,
-  getSearchMode,
-  setSearchMode
+  getSearchMode as getControllerSearchMode,
+  setSearchMode as setControllerSearchMode
 } from "./searchController.js";
 
 function num(v, fallback = 0) {
@@ -202,13 +202,17 @@ export function ensureSearchState(state) {
 
 export function getSearchModeValue(state) {
   ensureSearchState(state);
-  return getSearchMode(state);
+  return getControllerSearchMode(state);
 }
 
 export function setSearchModeValue(state, mode) {
   ensureSearchState(state);
-  setSearchMode(state, mode);
+  setControllerSearchMode(state, mode);
 }
+
+// Back-compat aliases for existing select.js imports.
+export const getSearchMode = getSearchModeValue;
+export const setSearchMode = setSearchModeValue;
 
 export function enterPickSlotMode(state, baseMovieIndex) {
   ensureSearchState(state);

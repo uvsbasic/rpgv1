@@ -16,6 +16,7 @@ export const movies = [
   { id: "office_space", title: "Office Space", shortTitle: "Office Space", runtime: 89, imdb: 7.7 },
   { id: "howls_moving_castle", title: "Howl's Moving Castle", shortTitle: "Howl's Moving Castle", runtime: 119, imdb: 8.2 },
   { id: "spirited_away", title: "Spirited Away", shortTitle: "Spirited Away", runtime: 125, imdb: 8.6 },
+  { id: "beavis_and_butthead_do_america", title: "Beavis and Butt-Head Do America", shortTitle: "Beavis & Butt-Head", runtime: 81, imdb: 6.8, lockedByMatinee: true },
   { id: "field_of_dreams", title: "Field of Dreams", shortTitle: "Field of Dreams", runtime: 107, imdb: 7.5 },
   
   
@@ -37,8 +38,9 @@ export const movies = [
   { id: "bull_durham", title: "Bull Durham", shortTitle: "Bull Durham", runtime: 108, imdb: 7.1 },
   { id: "dune_1984", title: "Dune (1984)", shortTitle: "Dune (1984)", runtime: 137, imdb: 6.3, lockedByMatinee: true },
   { id: "they_live", title: "They Live", shortTitle: "They Live", runtime: 94, imdb: 7.2 },
-  { id: "the_wiz", title: "The Wiz", shortTitle: "The Wiz", runtime: 134, imdb: 5.5, lockedByMatinee: true },
+  { id: "aliens", title: "Aliens", shortTitle: "Aliens", runtime: 137, imdb: 8.4, lockedByMatinee: true },
   { id: "mean_girls", title: "Mean Girls", shortTitle: "Mean Girls", runtime: 97, imdb: 7.1 },
+  { id: "the_wiz", title: "The Wiz", shortTitle: "The Wiz", runtime: 134, imdb: 5.5, lockedByMatinee: true },
   { id: "wicked", title: "Wicked", shortTitle: "Wicked", runtime: 160, imdb: 7.4 },
   { id: "wicked_for_good", title: "Wicked: For Good", shortTitle: "Wicked: For Good", runtime: 137, imdb: 6.9 },
 
@@ -48,6 +50,8 @@ export const movies = [
   { id: "empire_strikes_back", title: "The Empire Strikes Back", shortTitle: "The Empire Strikes Back", runtime: 124, imdb: 8.7 },
   { id: "mad_max_fury_road", title: "Mad Max: Fury Road", shortTitle: "Mad Max: Fury Road", runtime: 120, imdb: 8.1 },
   { id: "harry_potter_2001", title: "Harry Potter and the Sorcerer's Stone", shortTitle: "Harry Potter and Sorcerer's", runtime: 152, imdb: 7.6 },
+  { id: "harry_potter_chamber", title: "Harry Potter and the Chamber of Secrets", shortTitle: "Harry Potter and Chamber", runtime: 161, imdb: 7.4, lockedByMatinee: true },
+  { id: "harry_potter_azkaban", title: "Harry Potter and the Prisoner of Azkaban", shortTitle: "Harry Potter and Prisoner", runtime: 142, imdb: 7.9, lockedByMatinee: true },
   { id: "pirates_black_pearl", title: "Pirates of the Caribbean: The Curse of the Black Pearl", shortTitle: "Pirates: Black Pearl", runtime: 143, imdb: 8.1 },
   { id: "young_frankenstein", title: "Young Frankenstein", shortTitle: "Young Frankenstein", runtime: 106, imdb: 8.0 },
  
@@ -56,6 +60,8 @@ export const movies = [
   { id: "the_hangover", title: "The Hangover", shortTitle: "The Hangover", runtime: 100, imdb: 7.7 },
   { id: "zombieland", title: "Zombieland", shortTitle: "Zombieland", runtime: 88, imdb: 7.5 },
   { id: "iron_man", title: "Iron Man", shortTitle: "Iron Man", runtime: 126, imdb: 7.9 },
+  { id: "iron_man_3", title: "Iron Man 3", shortTitle: "Iron Man 3", runtime: 130, imdb: 7.1, lockedByMatinee: true },
+  { id: "transformers", title: "Transformers", shortTitle: "Transformers", runtime: 144, imdb: 7.1, lockedByMatinee: true },
   { id: "la_la_land", title: "La La Land", shortTitle: "La La Land", runtime: 128, imdb: 8.0 },
   { id: "get_out", title: "Get Out", shortTitle: "Get Out", runtime: 104, imdb: 7.7 },
   { id: "jurassic_park", title: "Jurassic Park", shortTitle: "Jurassic Park", runtime: 127, imdb: 8.2 },
@@ -70,6 +76,7 @@ export const movies = [
   { id: "coraline", title: "Coraline", shortTitle: "Coraline", runtime: 100, imdb: 7.8 },  
   { id: "monsters_inc", title: "Monsters, Inc.", shortTitle: "Monsters, Inc.", runtime: 92, imdb: 8.1 },
 
+
   { id: "jaws", title: "Jaws", shortTitle: "Jaws", runtime: 124, imdb: 8.1 },
   { id: "the_social_network", title: "The Social Network", shortTitle: "The Social Network", runtime: 120, imdb: 7.8 },
   { id: "wizard_of_oz", title: "The Wizard of Oz (1939)", shortTitle: "Wizard of Oz", runtime: 102, imdb: 8.1 },
@@ -78,15 +85,19 @@ export const movies = [
   { id: "ace_ventura_pet_detective", title: "Ace Ventura: Pet Detective", shortTitle: "Ace Ventura", runtime: 86, imdb: 6.9 },
 
   
-  { id: "christine", title: "Christine", shortTitle: "Christine", runtime: 110, imdb: 6.8 },
   { id: "halloween", title: "Halloween", shortTitle: "Halloween", runtime: 91, imdb: 7.7 },
+  { id: "the_thing", title: "The Thing", shortTitle: "The Thing", runtime: 109, imdb: 8.2, lockedByMatinee: true },
   { id: "this_is_spinal_tap", title: "This Is Spinal Tap", shortTitle: "This Is Spinal Tap", runtime: 82, imdb: 8.0 },
+  { id: "prince_of_darkness", title: "Prince of Darkness", shortTitle: "Prince of Darkness", runtime: 102, imdb: 6.6, lockedByMatinee: true },
+  { id: "christine", title: "Christine", shortTitle: "Christine", runtime: 110, imdb: 6.8 },
   { id: "scott_pilgrim", title: "Scott Pilgrim vs. the World", shortTitle: "Scott Pilgrim vs. the World", runtime: 112, imdb: 7.5 },
   { id: "spiderman_2002", title: "Spider-Man (2002)", shortTitle: "Spider-Man (2002)", runtime: 121, imdb: 7.4 },
   { id: "spiderman_2_2004", title: "Spider-Man 2 (2004)", shortTitle: "Spider-Man 2", runtime: 127, imdb: 7.5 },
+  { id: "cars_2", title: "Cars 2", shortTitle: "Cars 2", runtime: 106, imdb: 6.2, lockedByMatinee: true },
   { id: "grand_budapest", title: "The Grand Budapest Hotel", shortTitle: "The Grand Budapest Hotel", runtime: 99, imdb: 8.1 },
   { id: "love_and_mercy", title: "Love & Mercy", shortTitle: "Love & Mercy", runtime: 121, imdb: 7.4 },
   { id: "steve_jobs_2015", title: "Steve Jobs", shortTitle: "Steve Jobs", runtime: 122, imdb: 7.2 },
+  { id: "lethal_weapon_2", title: "Lethal Weapon 2", shortTitle: "Lethal Weapon 2", runtime: 114, imdb: 7.2, lockedByMatinee: true },
   { id: "the_nice_guys", title: "The Nice Guys", shortTitle: "The Nice Guys", runtime: 116, imdb: 7.4 },
   { id: "ten_things_i_hate_about_you", title: "10 Things I Hate About You", shortTitle: "10 Things I Hate About You", runtime: 97, imdb: 7.3 },
   { id: "your_name", title: "Your Name", shortTitle: "Your Name", runtime: 106, imdb: 8.4 },
@@ -148,6 +159,7 @@ export const movies = [
   { id: "from_dusk_till_dawn", title: "From Dusk Till Dawn", shortTitle: "From Dusk Till Dawn", runtime: 108, imdb: 7.2 },
   { id: "sin_city_2005", title: "Sin City (2005)", shortTitle: "Sin City", runtime: 124, imdb: 8.0 },
   { id: "evil_dead_2", title: "Evil Dead II", shortTitle: "Evil Dead II", runtime: 84, imdb: 7.7 },
+  { id: "doctor_strange_multiverse_madness", title: "Doctor Strange in the Multiverse of Madness", shortTitle: "Dr Strange: MoM", runtime: 126, imdb: 6.9, lockedByMatinee: true },
   { id: "escape_from_new_york", title: "Escape from New York", shortTitle: "Escape from New York", runtime: 99, imdb: 7.1 },
   
 
@@ -176,44 +188,32 @@ export const movies = [
   { id: "dark_knight_rises", title: "The Dark Knight Rises", shortTitle: "The Dark Knight Rises", runtime: 164, imdb: 8.4 },
   { id: "lion_king", title: "The Lion King", shortTitle: "The Lion King", runtime: 88, imdb: 8.5 },
   { id: "back_to_the_future", title: "Back to the Future", shortTitle: "Back to the Future", runtime: 116, imdb: 8.5 },
+  { id: "superman_1978", title: "Superman (1978)", shortTitle: "Superman (1978)", runtime: 143, imdb: 7.4, lockedByMatinee: true },
   { id: "superman_2", title: "Superman II", shortTitle: "Superman II", runtime: 127, imdb: 6.8, lockedByMatinee: true },
   { id: "airplane", title: "Airplane!", shortTitle: "Airplane!", runtime: 88, imdb: 7.7 },
   { id: "shrek", title: "Shrek", shortTitle: "Shrek", runtime: 90, imdb: 7.9 },
   { id: "shrek_2", title: "Shrek 2", shortTitle: "Shrek 2", runtime: 93, imdb: 7.4 },
   { id: "terminator_2", title: "Terminator 2: Judgment Day", shortTitle: "T2: Judgment Day", runtime: 137, imdb: 8.6 },
   { id: "my_neighbor_totoro", title: "My Neighbor Totoro", shortTitle: "My Neighbor Totoro", runtime: 86, imdb: 8.1 },
+  { id: "nausicaa_valley_wind", title: "Nausicaa of the Valley of the Wind", shortTitle: "Nausicaa", runtime: 117, imdb: 8.0, lockedByMatinee: true },
   { id: "lotr_fellowship", title: "The Lord of the Rings: The Fellowship of the Ring", shortTitle: "LOTR: Fellowship", runtime: 178, imdb: 8.8 },
   { id: "lotr_two_towers", title: "The Lord of the Rings: The Two Towers", shortTitle: "LOTR: The Two Towers", runtime: 179, imdb: 8.7 },
   { id: "lotr_return_king", title: "The Lord of the Rings: The Return of the King", shortTitle: "Return of the King", runtime: 201, imdb: 9.0 },
   { id: "dune_2021", title: "Dune (2021)", shortTitle: "Dune (2021)", runtime: 155, imdb: 8.0 },
 
   // =========================
-  // Matinee expansion (hidden unlock movies)
+  // Expansion pack (hidden unlock movies)
   // =========================
   { id: "paprika", title: "Paprika", shortTitle: "Paprika", runtime: 90, imdb: 7.7, lockedByMatinee: true },
-  { id: "titanic", title: "Titanic", shortTitle: "Titanic", runtime: 194, imdb: 7.9, lockedByMatinee: true },
   { id: "monty_python_holy_grail", title: "Monty Python and the Holy Grail", shortTitle: "Holy Grail", runtime: 91, imdb: 8.2, lockedByMatinee: true },
   { id: "sound_of_music", title: "The Sound of Music", shortTitle: "Sound of Music", runtime: 172, imdb: 8.1, lockedByMatinee: true },
-  { id: "superman_1978", title: "Superman (1978)", shortTitle: "Superman (1978)", runtime: 143, imdb: 7.4, lockedByMatinee: true },
-  { id: "harry_potter_chamber", title: "Harry Potter and the Chamber of Secrets", shortTitle: "HP: Chamber", runtime: 161, imdb: 7.4, lockedByMatinee: true },
-  { id: "harry_potter_azkaban", title: "Harry Potter and the Prisoner of Azkaban", shortTitle: "HP: Azkaban", runtime: 142, imdb: 7.9, lockedByMatinee: true },
-  { id: "the_thing", title: "The Thing", shortTitle: "The Thing", runtime: 109, imdb: 8.2, lockedByMatinee: true },
-  { id: "aliens", title: "Aliens", shortTitle: "Aliens", runtime: 137, imdb: 8.4, lockedByMatinee: true },
   { id: "the_master", title: "The Master", shortTitle: "The Master", runtime: 137, imdb: 7.1, lockedByMatinee: true },
   { id: "blue_velvet", title: "Blue Velvet", shortTitle: "Blue Velvet", runtime: 120, imdb: 7.7, lockedByMatinee: true },
-  { id: "iron_man_3", title: "Iron Man 3", shortTitle: "Iron Man 3", runtime: 130, imdb: 7.1, lockedByMatinee: true },
-  { id: "lethal_weapon_2", title: "Lethal Weapon 2", shortTitle: "Lethal Weapon 2", runtime: 114, imdb: 7.2, lockedByMatinee: true },
   { id: "drag_me_to_hell", title: "Drag Me to Hell", shortTitle: "Drag Me to Hell", runtime: 99, imdb: 6.6, lockedByMatinee: true },
-  { id: "doctor_strange_multiverse_madness", title: "Doctor Strange in the Multiverse of Madness", shortTitle: "Dr Strange: MoM", runtime: 126, imdb: 6.9, lockedByMatinee: true },
-  { id: "transformers", title: "Transformers", shortTitle: "Transformers", runtime: 144, imdb: 7.1, lockedByMatinee: true },
-  { id: "cars_2", title: "Cars 2", shortTitle: "Cars 2", runtime: 106, imdb: 6.2, lockedByMatinee: true },
-  { id: "nausicaa_valley_wind", title: "Nausicaa of the Valley of the Wind", shortTitle: "Nausicaa", runtime: 117, imdb: 8.0, lockedByMatinee: true },
-  { id: "beavis_and_butthead_do_america", title: "Beavis and Butt-Head Do America", shortTitle: "Beavis & Butt-Head", runtime: 81, imdb: 6.8, lockedByMatinee: true },
-  { id: "idiocracy", title: "Idiocracy", shortTitle: "Idiocracy", runtime: 84, imdb: 6.5, lockedByMatinee: true },
-  { id: "extract", title: "Extract", shortTitle: "Extract", runtime: 92, imdb: 6.1, lockedByMatinee: true },
   { id: "the_mask", title: "The Mask", shortTitle: "The Mask", runtime: 101, imdb: 6.9, lockedByMatinee: true },
   { id: "dumb_and_dumber", title: "Dumb and Dumber", shortTitle: "Dumb and Dumber", runtime: 107, imdb: 7.3, lockedByMatinee: true },
-  { id: "prince_of_darkness", title: "Prince of Darkness", shortTitle: "Prince of Darkness", runtime: 102, imdb: 6.6, lockedByMatinee: true },
+  { id: "idiocracy", title: "Idiocracy", shortTitle: "Idiocracy", runtime: 84, imdb: 6.5, lockedByMatinee: true },
+  { id: "extract", title: "Extract", shortTitle: "Extract", runtime: 92, imdb: 6.1, lockedByMatinee: true },
   // =========================
   // ====== ONLY THESE MOVIES ARE HIDDEN UNTIL UNLOCKED (per your request) ======
   // =========================
@@ -251,7 +251,8 @@ export const movies = [
   //Other Locked Movies
   { id: "mystery_train", title: "Mystery Train (1989)", shortTitle: "Mystery Train", runtime: 113, imdb: 7.5, lockedBy: "test_test" },
   { id: "wings_of_desire", title: "Wings of Desire (1987)", shortTitle: "Wings of Desire", runtime: 128, imdb: 8.0, lockedBy: "test_test" },
-  { id: "mandy_2018", title: "Mandy (2018)", shortTitle: "Mandy (2018)", runtime: 121, imdb: 6.5, lockedBy: "test_test" }
+  { id: "mandy_2018", title: "Mandy (2018)", shortTitle: "Mandy (2018)", runtime: 121, imdb: 6.5, lockedBy: "test_test" },
+  { id: "titanic", title: "Titanic", shortTitle: "Titanic", runtime: 194, imdb: 7.9, lockedByMatinee: true },
 ];
 
 // Returns movies filtered by what’s unlocked.

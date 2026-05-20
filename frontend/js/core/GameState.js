@@ -26,7 +26,7 @@ export const GameState = {
   },
 
 
-  // Enemy chosen for the current level (template from data/enemies.js)
+  // Enemy chosen for the current level (template from data/enemies/enemies.js)
   enemyTemplate: null,
 
   // Optional one-off special flow hooks (e.g. report-bug keyword route)

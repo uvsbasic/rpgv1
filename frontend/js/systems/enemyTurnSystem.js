@@ -13,7 +13,7 @@
 // This file does not decrement status durations. (You’ll tick turns elsewhere—typically at the
 // start of each actor’s turn or at round boundaries.) This only *applies* the current modifiers.
 
-import { enemyMoves } from "../data/enemyMoves.js";
+import { enemyMoves } from "../data/enemies/enemyMoves.js";
 import { computeEnemyAttack } from "./damageSystem.js";
 import { getAliveParty } from "./turnSystem.js";
 

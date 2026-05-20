@@ -3,7 +3,7 @@
 import { GameState, changeScreen } from "../game.js";
 import { SCREEN, LEGACY_320, INTRO_LAYOUT } from "../layout.js";
 import { Input } from "../ui.js";
-import { enemies } from "../data/enemies.js";
+import { enemies } from "../data/enemies/enemies.js";
 import { playUIConfirmBlip, playUIBackBlip } from "../sfx/uiSfx.js";
 
 function pickRandomEnemy() {

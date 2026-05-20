@@ -11,7 +11,7 @@ export const playerArchetypes = [
   { id: "oscar_bait", name: "Oscar Bait", movieIds: ["moonlight", "birdman", "roma", "nomadland"], hidden: false },
   { id: "blockbuster_fan", name: "Blockbuster Fan", movieIds: ["star_wars", "raiders_of_the_lost_ark", "jurassic_park", "avengers"], hidden: false },
   { id: "a24_enthusiast", name: "A24 Enthusiast", movieIds: ["hereditary", "midsommar", "lady_bird", "everything_everywhere"], hidden: false },
-  { id: "anime_theater_regular", name: "Anime Theater Regular", movieIds: ["spirited_away", "howls_moving_castle", "your_name", "akira"], hidden: false },
+  { id: "anime_theater_regular", name: "Anime Fanatic", movieIds: ["spirited_away", "howls_moving_castle", "your_name", "akira"], hidden: false },
   { id: "horror_buff", name: "Horror Buff", movieIds: ["halloween", "the_shining", "alien", "nightmare_on_elm_street"], hidden: false },
   { id: "scifi_purist", name: "Sci-Fi Purist", movieIds: ["the_matrix", "the_terminator", "blade_runner_2049", "interstellar"], hidden: false },
   { id: "romcom_apologist", name: "Rom-Com Apologist", movieIds: ["when_harry_met_sally", "ten_things_i_hate_about_you", "crazy_rich_asians", "notting_hill"], hidden: false },

@@ -28,7 +28,7 @@ import {
   PARTY_FALLEN_PROMPT,
   TARGET_KNOCKED_OUT_TEMPLATE
 } from "../lines/enemyTurnText.js";
-import { enemyMoves } from "../../data/enemyMoves.js";
+import { enemyMoves } from "../../data/enemies/enemyMoves.js";
 
 function renderTemplate(str, vars) {
   return String(str || "").replace(/\{(\w+)\}/g, (_, k) => (vars[k] != null ? String(vars[k]) : `{${k}}`));

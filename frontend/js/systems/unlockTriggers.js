@@ -52,7 +52,8 @@ export function peekUnlockEvents(GameState) {
 }
 
 function isScreenUnlockEvent(e) {
-  return e?.type === "ARCHETYPE_UNLOCKED" && e?.presentation === "screen";
+  const type = String(e?.type || "");
+  return (type === "ARCHETYPE_UNLOCKED" || type === "MOVIE_UNLOCKED") && e?.presentation === "screen";
 }
 
 export function hasPendingScreenUnlockEvent(GameState) {

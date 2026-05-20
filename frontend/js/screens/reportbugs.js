@@ -325,8 +325,12 @@ export const ReportBugsScreen = {
         if (chooseYes) {
           GameState.specialFlow = {
             type: "eggBattle",
-            hideEnemyLevel: true
+            hideEnemyLevel: true,
+            source: "reportbugs"
           };
+          if (!GameState.flags) GameState.flags = {};
+          if (!GameState.flags.secrets) GameState.flags.secrets = {};
+          GameState.flags.secrets.eggBattleEntrySource = "reportbugs";
           removeDom();
           changeScreen("select");
           return;

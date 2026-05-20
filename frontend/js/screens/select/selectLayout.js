@@ -184,6 +184,7 @@ export function searchRects({ SCREEN, L }) {
   const x = Math.floor((W - sw) / 2);
 
   return {
+    leftOuter: { x: x - btn - gap - btn - gap, y, w: btn, h: sh },
     left: { x: x - btn - gap, y, w: btn, h: sh },
     mid: { x, y, w: sw, h: sh },
     right: { x: x + sw + gap, y, w: btn, h: sh }

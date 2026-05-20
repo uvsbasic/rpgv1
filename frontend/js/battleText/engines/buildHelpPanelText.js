@@ -9,7 +9,7 @@ import {
   buildItemTargetBody,
   HELP_PANEL_TEXT,
   HELP_PANEL_RUNTIME_TEXT
-} from "./helpPanelText.js";
+} from "../lines/helpPanelText.js";
 import { buildNoSpecialSelectedLine, buildNoSpecialsAvailableLine } from "./corePrompts.js";
 import { normalizeTargetTags as normalizeTags } from "../../systems/specialTags.js";
 

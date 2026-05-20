@@ -3,7 +3,7 @@
 // Single source of truth for creating enemies for battle.
 // Everything (campaign, quickplay, random fights) should call spawnEnemy().
 
-import { enemies } from "../data/enemies.js";
+import { enemies } from "../data/enemies/enemies.js";
 
 function levelMultiplier(level = 1) {
   const L = Math.max(1, Number(level) || 1);

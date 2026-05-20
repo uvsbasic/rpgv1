@@ -25,7 +25,13 @@ const __dirname = path.dirname(__filename);
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
 const POSTER_SIZE = "w342"; // used only for tmdbId/search paths
 const FORCE = process.argv.includes("--force");
-const OVERRIDES = {};
+const ID_ARG_INDEX = process.argv.indexOf("--id");
+const ONLY_ID = ID_ARG_INDEX >= 0 ? String(process.argv[ID_ARG_INDEX + 1] || "").trim() : "";
+const OVERRIDES = {
+  transformers: {
+    directPosterUrl: "https://image.tmdb.org/t/p/original/1P7w3AImoEOWJX7nn3fdaKDfEQA.jpg"
+  }
+};
 
 const MOVIES_PATH = path.join(__dirname, "../frontend/js/data/movies.js");
 const POSTERS_DIR = path.join(__dirname, "../frontend/assets/posters");
@@ -109,7 +115,10 @@ function chooseResult(results, preferredYear) {
 async function main() {
   ensureDir(POSTERS_DIR);
 
-  const movies = await loadMovies();
+  const allMovies = await loadMovies();
+  const movies = ONLY_ID
+    ? allMovies.filter((m) => String(m?.id || "") === ONLY_ID)
+    : allMovies;
 
   let ok = 0;
   let skipped = 0;
@@ -118,6 +127,7 @@ async function main() {
 
   console.log(`Poster size (tmdbId/search only): ${POSTER_SIZE}`);
   console.log(`Force overwrite: ${FORCE ? "YES" : "NO"}`);
+  if (ONLY_ID) console.log(`Only movie id: ${ONLY_ID}`);
   console.log("");
 
   for (const movie of movies) {

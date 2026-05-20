@@ -114,7 +114,7 @@ export const specials = {
   },
   taxi_driver: {
     id: "you_talkin_to_me",
-    name: "You Talkin’ to Me?",
+    name: "You Talkin' to Me?",
     description: "A tense confrontation that hits hard.",
     kind: "damageEnemy",
     target: "enemy",
@@ -189,7 +189,7 @@ export const specials = {
   temple_of_doom: {
     id: "kali_ma",
     name: "Kali Ma",
-    description: "A terrifying chant strikes at the enemy’s core.",
+    description: "A terrifying chant strikes at the enemy's core.",
     kind: "damageEnemy",
     target: "enemy",
     powerMultiplier: 1.85,
@@ -198,7 +198,7 @@ export const specials = {
   last_crusade: {
     id: "choose_wisely",
     name: "Choose Wisely",
-    description: "A clever twist restores an ally’s health.",
+    description: "A clever twist restores an ally's health.",
     kind: "healAlly",
     target: "ally",
     amount: 40,
@@ -378,7 +378,7 @@ export const specials = {
   mean_girls: {
     // NOTE: second Mean Girls special is in extraSpecials below.
     id: "you_cant_sit_with_us",
-    name: "You Can’t Sit With Us",
+    name: "You Can't Sit With Us",
     description: "Social warfare hits harder than it should.",
     kind: "damageEnemy",
     target: "enemy",
@@ -387,7 +387,7 @@ export const specials = {
   },
   clue: {
     id: "flames_on_the_side",
-    name: "Flames… on the Side",
+    name: "Flames... on the Side",
     description: "A chaotic accusation damages the enemy.",
     kind: "damageEnemy",
     target: "enemy",
@@ -433,7 +433,7 @@ export const specials = {
   truman_show: {
     id: "the_doorway",
     name: "The Doorway",
-    description: "A bold exit restores an ally’s resolve.",
+    description: "A bold exit restores an ally's resolve.",
     kind: "healAlly",
     target: "ally",
     amount: 42,
@@ -555,7 +555,7 @@ export const specials = {
   },
   se7en: {
     id: "whats_in_the_box",
-    name: "What’s in the Box?",
+    name: "What's in the Box?",
     description: "A devastating moment deals heavy damage.",
     kind: "damageEnemy",
     target: "enemy",
@@ -602,7 +602,7 @@ export const specials = {
   },
   se7en_top: {
     id: "whats_in_the_box_top",
-    name: "What’s in the Box?",
+    name: "What's in the Box?",
     description: "A devastating moment deals heavy damage.",
     kind: "damageEnemy",
     target: "enemy",
@@ -622,7 +622,7 @@ export const specials = {
   },
   the_shining: {
     id: "heres_johnny",
-    name: "Here’s Johnny!",
+    name: "Here's Johnny!",
     description: "A horrifying burst of damage.",
     kind: "damageEnemy",
     target: "enemy",
@@ -686,7 +686,7 @@ export const specials = {
   they_live: {
     id: "obey",
     name: "OBEY",
-    description: "Reality snaps into focus—big damage.",
+    description: "Reality snaps into focus-big damage.",
     kind: "damageEnemy",
     target: "enemy",
     powerMultiplier: 1.8,
@@ -705,7 +705,7 @@ export const specials = {
   // Romance / Rom-Com
   when_harry_met_sally: {
     id: "i_ll_have_what_she_s_having",
-    name: "I’ll Have What She’s Having",
+    name: "I'll Have What She's Having",
     description: "A burst of confidence heals you.",
     kind: "healSelf",
     target: "self",
@@ -752,7 +752,7 @@ export const specials = {
   },
   the_terminator: {
     id: "i_ll_be_back",
-    name: "I’ll Be Back",
+    name: "I'll Be Back",
     description: "An unstoppable strike deals heavy damage.",
     kind: "damageEnemy",
     target: "enemy",
@@ -909,7 +909,7 @@ export const specials = {
   raging_bull: {
     id: "rope_a_dope",
     name: "Rope-a-Dope",
-    description: "Absorb, then explode—massive damage.",
+    description: "Absorb, then explode-massive damage.",
     kind: "damageEnemy",
     target: "enemy",
     powerMultiplier: 2.05, // stronger (single-genre)
@@ -917,7 +917,7 @@ export const specials = {
   },
   amadeus_1984: {
     id: "salieri_s_grudge",
-    name: "Salieri’s Grudge",
+    name: "Salieri's Grudge",
     description: "A poisonous ambition deals heavy damage.",
     kind: "damageEnemy",
     target: "enemy",
@@ -928,7 +928,7 @@ export const specials = {
   // Classics / World Cinema
   casablanca: {
     id: "well_always_have_paris",
-    name: "We’ll Always Have Paris",
+    name: "We'll Always Have Paris",
     description: "A bittersweet resolve heals an ally.",
     kind: "healAlly",
     target: "ally",
@@ -964,7 +964,7 @@ export const specials = {
   },
   singin_in_the_rain: {
     id: "make_em_laugh",
-    name: "Make ’Em Laugh",
+    name: "Make 'Em Laugh",
     description: "A joyful burst heals you.",
     kind: "healSelf",
     target: "self",
@@ -1027,7 +1027,7 @@ export const specials = {
   },
   pans_labyrinth: {
     id: "faun_s_path",
-    name: "The Faun’s Path",
+    name: "The Faun's Path",
     description: "Dark magic heals an ally.",
     kind: "healAlly",
     target: "ally",
@@ -1197,7 +1197,7 @@ export const specials = {
   },
   the_fugitive: {
     id: "i_didnt_kill_my_wife",
-    name: "I Didn’t Kill My Wife!",
+    name: "I Didn't Kill My Wife!",
     description: "A desperate escape restores your strength.",
     kind: "healSelf",
     target: "self",
@@ -1258,11 +1258,10 @@ export const specials = {
     powerMultiplier: 1.95,
     cooldownTurns: 3
   },
-  // ✅ Office Space: new "pages" shape, but each move uses the SAME schema your system already supports.
+  //  Office Space: new "pages" shape, but each move uses the SAME schema your system already supports.
   // Page 0 is default when you open Specials. Press Space in the SPECIAL menu to toggle pages.
   office_space: {
     pages: [
-      // Page 0 (default)
       [
         {
           id: "office_space_tps_reports",
@@ -1282,86 +1281,12 @@ export const specials = {
           powerMultiplier: 1.9,
           cooldownTurns: 4
         }
-      ],
-      // Page 1
-      [
-        {
-          id: "office_space_red_stapler",
-          name: "Red Stapler",
-          description: "An oddly comforting fixation heals you.",
-          kind: "healSelf",
-          target: "self",
-          amount: 55,
-          cooldownTurns: 3
-        },
-        {
-          id: "office_space_passive_resistance",
-          name: "Passive Resistance",
-          description: "You simply stop caring. The enemy’s attacks lose impact.",
-          kind: "debuffEnemy",
-          target: "enemy",
-          defDebuffPct: 0.3,
-          defDebuffTurns: 2,
-          cooldownTurns: 4
-        },
-        {
-          id: "office_space_corporate_restructuring",
-          name: "Corporate Restructuring",
-          description: "Slash inefficiencies—at a personal cost.",
-          kind: "damageEnemy",
-          target: "enemy",
-          powerMultiplier: 4.2,
-          selfDefDebuffPct: 0.15,
-          selfDefDebuffTurns: 2,
-          cooldownTurns: 5
-        }
-      ],
-      // Page 2
-      [
-        {
-          id: "office_space_monday_morning",
-          name: "Case of the Mondays",
-          description: "Crushing dread slows the enemy’s next move.",
-          kind: "statusEnemy",
-          target: "enemy",
-          status: "dazed",
-          chance: 1,
-          turns: 1,
-          nextHitVulnActive: true,
-          nextHitVulnPct: 0.5,
-          nextHitVulnTurns: 1,
-          cooldownTurns: 4
-        },
-        {
-          id: "office_space_flair_compliance",
-          name: "Flair Compliance",
-          description: "Mandatory positivity boosts team performance.",
-          kind: "buffParty",
-          target: "team",
-          atkBuffPct: 0.2,
-          atkBuffTurns: 2,
-          cooldownTurns: 4
-        },
-        {
-          id: "office_space__micromanage",
-          name: "Yeeaaaaaaaaaahhhhhhhhhh…",
-          description: "A soul-crushing remark hits the enemy hard.",
-          kind: "damageEnemy",
-          target: "enemy",
-          powerMultiplier: 5,
-          cooldownTurns: 4
-        }
       ]
     ],
-    pageMeta: [
-      { includeGenre: true },   // page 1: signature + genre
-      { includeGenre: false },
-      { includeGenre: false} 
-    ]
+    pageMeta: [{ includeGenre: true }]
   },
   this_is_spinal_tap: {
     pages: [
-      // Page 0 (default)
       [
         {
           id: "turn_it_to_eleven",
@@ -1372,101 +1297,28 @@ export const specials = {
           powerMultiplier: 1.75,
           cooldownTurns: 3
         }
-      ],
-      [
-        {
-          id: "stonehenge",
-          name: "Stonehenge",
-          description: "The stage spectacle goes hilariously wrong, throwing the enemy off-balance.",
-          kind: "ENEMY_DEBUFF",
-          target: "enemy",
-          atkPct: 0.20,
-          defPct: 0.15,
-          turns: 2,
-          cooldownTurns: 4
-        },
-        {
-          id: "none_more_black",
-          name: "None More Black",
-          description: "An aggressively dark aesthetic boosts your presence and poise.",
-          kind: "SELF_BUFF",
-          target: "self",
-          atkPct: 0.20,
-          defPct: 0.20,
-          turns: 2,
-          cooldownTurns: 3
-        },
-        {
-          id: "spinal_tap_combustion",
-          name: "Spontaneous Combustion",
-          description: "A drummer meets a tragic rock-and-roll fate.",
-          kind: "damageEnemy",
-          target: "enemy",
-          powerMultiplier: 1.95,
-          cooldownTurns: 4
-        }
       ]
     ],
-    pageMeta: [
-      { includeGenre: true },   // page 1: signature + genre
-      { includeGenre: false } 
-    ]
+    pageMeta: [{ includeGenre: true }]
   },
   howls_moving_castle: {
     pages: [
       [
         {
-        id: "castle_in_motion",
-        name: "Castle in Motion",
-        description: "A sweeping magical strike.",
-        kind: "damageEnemy",
-        target: "enemy",
-        powerMultiplier: 1.85,
-        cooldownTurns: 3
-        }
-      ],
-      [
-        {
-          id: "calcifers_flare",
-          name: "Calcifer’s Flare",
-          description: "Calcifer surges—hot enough to melt resolve.",
+          id: "castle_in_motion",
+          name: "Castle in Motion",
+          description: "A sweeping magical strike.",
           kind: "damageEnemy",
           target: "enemy",
-          powerMultiplier: 4.2,
-          cooldownTurns: 4
-        },
-        {
-          id: "howls_heart",
-          name: "Howl's Heart",
-          description: "A vow of warmth and magic restores what was lost.",
-          kind: "healAllyMissingPct",
-          target: "ally",
-          missingHealPct: 0.8,
-          revivePct: 0.8,
-          cooldownTurns: 5
-        },
-        {
-          id: "witch_of_the_waste",
-          name: "Witch of the Waste",
-          description: "A lingering curse saps the enemy’s strength and guard.",
-          kind: "ENEMY_DEBUFF",
-          target: "enemy",
-          atkPct: 0.20,
-          defPct: 0.20,
-          turns: 2,
-          cooldownTurns: 2
+          powerMultiplier: 1.85,
+          cooldownTurns: 3
         }
       ]
     ],
-    pageMeta: [
-      { includeGenre: true },   // page 1: signature + genre
-      { includeGenre: false }
-    ]
+    pageMeta: [{ includeGenre: true }]
   },
-
   purple_rain: {
     pages: [
-      // Page 0 (default)
       [
         {
           id: "purple_rain_go_crazy",
@@ -1477,125 +1329,12 @@ export const specials = {
           powerMultiplier: 1.75,
           cooldownTurns: 3
         }
-      ],
-
-      // Page 1 (Space toggle)
-      [
-        {
-          id: "purple_rain_darling_nikki",
-          name: "Darling Nikki",
-          description: "A dangerous confession leaves enemies exposed!",
-          kind: "dualEffect",
-          cooldownTurns: 3,
-
-          effects: [
-            {
-              kind: "damageEnemy",
-              target: "enemy",
-              powerMultiplier: 1.75
-            },
-            {
-              kind: "STATUS",
-              target: "enemy",
-              status: "stun",
-              turns: 1,
-              chance: 0.4
-            }
-          ]
-        },
-        {
-          id: "purple_rain_jungle_love",
-          name: "Jungle Love",
-          description: "Unfiltered funk and swagger overwhelm the enemy's senses.",
-          kind: "dualEffect",
-          cooldownTurns: 3,
-
-          effects: [
-            {
-              kind: "damageEnemy",
-              target: "enemy",
-              powerMultiplier: 1.6
-            },
-            {
-              kind: "STATUS",
-              target: "enemy",
-              status: "confused",
-              turns: 3,
-              chance: 0.8,
-
-              // confusion system knobs (used by your confusion logic)
-              confuseProcChance: 0.35,
-              confuseClearChance: 0.25,
-              confuseRampProc: 0.10,
-              confuseRampClear: 0.10
-            }
-          ]
-        },
-        {
-          id: "purple_rain_lake_minnetonka",
-          name: "The Waters of Lake Minnetonka",
-          description: "A legendary ritual restores what was lost.",
-          kind: "healAllyMissingPct",
-          target: "ally",
-          missingHealPct: 0.75,
-          revivePct: 0.75,
-          cooldownTurns: 4,
-        }
-      ],
-      [
-        {
-          id: "purple_rain_first_avenue",
-          name: "First Avenue Showstopper",
-          description: "A legendary First Avenue performance leaves the crowd breathless and the enemy stunned.",
-          kind: "STATUS",
-          target: ["enemy"],
-          status: "stun",
-          turns: 2,
-          chance: 1,
-          cooldownTurns: 5
-        },
-        {
-          id: "purple_rain_sex_shooter",
-          name: "Sex Shooter",
-          description: "A provocative distraction throws the enemy completely off their game.",
-          kind: "dualEffect",
-          cooldownTurns: 3,
-
-          effects: [
-            {
-              kind: "damageEnemy",
-              target: "enemy",
-              powerMultiplier: 2
-            },
-            {
-              kind: "STATUS",
-              target: "enemy",
-              status: "dazed",
-              turns: 2,
-              chance: 0.8
-            }
-          ]
-        },
-        {
-        id: "purple_rain_purple_rain",
-          name: "Purple Rain",
-          description: "A cathartic storm cleanses the mind and soul.",
-          kind: "healTeamMissingPct",
-          target: "team",
-          missingHealPct: 0.75,
-          cooldownTurns: 5
-        }
       ]
     ],
-    pageMeta: [
-      { includeGenre: true },   // page 1: signature + genre
-      { includeGenre: false },
-      {includeGenre: false } 
-    ]
+    pageMeta: [{ includeGenre: true }]
   },
   harry_potter_2001: {
     pages: [
-      // Page 0 (default)
       [
         {
           id: "wingardium_leviosa",
@@ -1606,53 +1345,12 @@ export const specials = {
           powerMultiplier: 1.70,
           cooldownTurns: 3
         }
-      ],
-      // Page 1 (extra)
-      [
-        {
-          id: "expelliarmus",
-          name: "Expelliarmus",
-          description: "Disarms the enemy, throwing off their rhythm and lowering their attack.",
-          kind: "ENEMY_DEBUFF",
-          target: "enemy",
-          atkPct: 0.25,
-          defPct: 0.0,
-          turns: 2,
-          cooldownTurns: 4
-        },
-        {
-          id: "protego",
-          name: "Protego",
-          description: "A protective barrier that hardens your defenses for a few turns.",
-          kind: "SELF_BUFF",
-          target: "self",
-          atkPct: 0.0,
-          defPct: 0.30,
-          turns: 2,
-          cooldownTurns: 3
-        },
-        {
-          id: "sorting_hat",
-          name: "Sorting Hat",
-          description: "Finds your house confidence—boosting both poise and presence.",
-          kind: "SELF_BUFF",
-          target: "self",
-          atkPct: 0.15,
-          defPct: 0.15,
-          turns: 3,
-          cooldownTurns: 4
-        }
       ]
     ],
-    pageMeta: [
-      { includeGenre: true },
-      { includeGenre: false }
-    ]
+    pageMeta: [{ includeGenre: true }]
   },
-
   love_and_mercy: {
     pages: [
-      // Page 0 (default)
       [
         {
           id: "good_vibrations_hit",
@@ -1663,62 +1361,12 @@ export const specials = {
           powerMultiplier: 1.75,
           cooldownTurns: 3
         }
-      ],
-      // Page 1 (extra)
-      [
-        {
-          id: "pet_sounds",
-          name: "Pet Sounds",
-          description: "Layer by layer, you build something perfect—boosting your offense.",
-          kind: "SELF_BUFF",
-          target: "self",
-          atkPct: 0.25,
-          defPct: 0.0,
-          turns: 2,
-          cooldownTurns: 3
-        },
-        {
-          id: "god_only_knows",
-          name: "God Only Knows",
-          description: "It's a love song...AND a suicide note!",
-          kind: "dualEffect",
-          cooldownTurns: 4,
-
-          effects: [
-            {
-              kind: "healAllyMissingPct",
-              target: "ally",
-              missingHealPct: 0.55,
-              revivePct: 0.55
-            },
-            {
-              kind: "damageEnemy",
-              target: "enemy",
-              powerMultiplier: 1.45
-            }
-          ]
-        },
-        {
-          id: "surfs_up",
-          name: "Surf's Up",
-          description: "A children's song that flows into a spiritual awakening of the mind and soul, allowing you to give yourself to god.",
-          kind: "healSelfMissingPct",
-          target: "self",
-          missingHealPct: 0.9,
-          cooldownTurns: 5
-        }
-
       ]
     ],
-    pageMeta: [
-      { includeGenre: true },
-      { includeGenre: false }
-    ]
+    pageMeta: [{ includeGenre: true }]
   },
-
   steve_jobs_2015: {
     pages: [
-      // Page 0 (default)
       [
         {
           id: "keynote_reveal",
@@ -1732,7 +1380,7 @@ export const specials = {
         {
           id: "reality_distortion_field",
           name: "Reality Distortion Field",
-          description: "Bends the conversation—weakening the enemy’s offense and defense.",
+          description: "Bends the conversation-weakening the enemy's offense and defense.",
           kind: "ENEMY_DEBUFF",
           target: "enemy",
           atkPct: 0.20,
@@ -1740,67 +1388,10 @@ export const specials = {
           turns: 2,
           cooldownTurns: 4
         }
-        ],
-        [        
-        {
-          id: "product_vision",
-          name: "Product Vision",
-          description: "Locks in the endgame—boosting your attack for the next exchange.",
-          kind: "SELF_BUFF",
-          target: "self",
-          atkPct: 0.30,
-          defPct: 0.0,
-          turns: 2,
-          cooldownTurns: 3
-        },
-        {
-          id: "kill_your_darlings",
-          name: "Kill Your Darlings",
-          description: "You cut what doesn’t matter. Momentum stalls, and only the essentials remain.",
-          kind: "STATUS",
-          target: ["enemy"],
-
-          status: "cooldown_lock",
-          turns: 2,
-          chance: 1,
-
-          nextHitVulnActive: true,
-          nextHitVulnPct: 0.35,
-          nextHitVulnTurns: 2,
-
-          cooldownTurns: 5
-        },
-        {
-          id: "the_orchestra",
-          name: "Play The Orchestra",
-          description: "You conduct the moment. Every part locks in at once—your entire team surges forward in perfect sync.",
-          kind: "dualEffect",
-          cooldownTurns: 5,
-
-          effects: [
-            {
-              kind: "buffParty",
-              target: "team",
-              atkPct: 0.30,
-              defPct: 0.25,
-              turns: 2
-            },
-            {
-              kind: "teamStrike",
-              target: "enemy",
-              totalMinMult: 1.6,
-              totalMaxMult: 2.6
-            }
-          ]
-        }
       ]
     ],
-    pageMeta: [
-      { includeGenre: true },
-      { includeGenre: false }
-    ]
-  },
-
+    pageMeta: [{ includeGenre: true }]
+  }
 };
 
 // -----------------------------

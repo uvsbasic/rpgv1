@@ -7,13 +7,13 @@
 // - Option 4: render helpers -> select/selectRenderHelpers.js
 // - Option 5: input dispatcher -> select/selectInputHandlers.js
 //
-// + Search (movies.js only) -> select/selectDefaultSearch.js
+// + Search (movies.js only) -> select/search/searchEngine.js
 //   - type-to-suggest dropdown
 //   - pick a suggestion -> enter “pick slot” mode
 //   - click a slot -> place movie, exit mode
 
 import { movies, getAvailableMovies } from "../data/movies.js";
-import { enemies } from "../data/enemies.js";
+import { enemies } from "../data/enemies/enemies.js";
 import { playerArchetypes } from "../data/playerArchetypes.js";
 import { calculateMovieStats } from "../combat/stats.js";
 import { GameState, changeScreen } from "../game.js";
@@ -51,7 +51,7 @@ import {
   exitPickSlotMode,
   getSearchMode,
   setSearchMode
-} from "./select/selectDefaultSearch.js";
+} from "./select/search/searchEngine.js";
 
 import {
   ensureSelectTextInput,
@@ -495,9 +495,17 @@ function settingsButtonRect() {
   return { x: sr.right.x + sr.right.w + 6, y: sr.right.y, w: 20, h: sr.right.h };
 }
 
+function triggerSearchEnter() {
+  try {
+    ensureSearchState(state);
+    if (!Array.isArray(state.search.queue)) state.search.queue = [];
+    state.search.queue.push({ type: "enter" });
+  } catch {}
+}
+
 function settingsOverlayRect() {
   const w = 250;
-  const h = 128;
+  const h = 160;
   const x = Math.floor((SCREEN.W - w) / 2);
   const y = 78;
   return { x, y, w, h };
@@ -686,6 +694,9 @@ function clearExpandedCatalogCache() {
   GameState.catalog.byId = {};
   GameState.catalog.expandedMovies = [];
   safeRemoveLS(LS_SELECT_EXPANDED_CACHE);
+  // Keep behavior intuitive: expanded cache clear should also clear living-catalog cache
+  // used by expanded-search fallback indexing.
+  safeRemoveLS("livingCatalog:v1");
 
   // Any slot currently pointing at an expanded entry is reset to first movie.
   if (Array.isArray(state.slots)) {
@@ -698,6 +709,20 @@ function clearExpandedCatalogCache() {
   }
   state.expandedSlotOverrides = [null, null, null, null];
   safeRemoveLS(LS_SELECT_EXPANDED_OVERRIDES);
+
+  // Also clear expanded search runtime cache so prior empty/error results
+  // do not stick for the same query during this session.
+  try {
+    ensureSearchState(state);
+    if (state.search?.controller && typeof state.search.controller === "object") {
+      state.search.controller.cache = Object.create(null);
+      state.search.controller.inFlightKey = null;
+      state.search.controller.requestSeq = Number(state.search.controller.requestSeq || 0) + 1;
+    }
+    state.search.suggestions = [];
+    state.search.selectedSuggestion = 0;
+    state.search.dropdownBox = null;
+  } catch {}
 }
 
 function rememberExpandedMovie(movieLike) {
@@ -1047,6 +1072,9 @@ function goHome() {
   resetRandomizeStreak();
   if (String(GameState?.specialFlow?.type || "") === "eggBattle") {
     GameState.specialFlow = null;
+    if (GameState?.flags?.secrets?.eggBattleEntrySource) {
+      delete GameState.flags.secrets.eggBattleEntrySource;
+    }
   }
 
   try {
@@ -1259,6 +1287,7 @@ export const SelectScreen = {
     if (state.settingsOpen) {
       const listModes = ["default", "alphabetical", "genre", "year"];
       const searchModes = ["curated", "expanded"];
+      const SETTINGS_ROW_COUNT = 4;
 
       if (Input.pressed("Back") || Input.pressed("Toggle")) {
         state.settingsOpen = false;
@@ -1267,12 +1296,12 @@ export const SelectScreen = {
         return;
       }
       if (Input.pressed("Up")) {
-        state.settingsRow = (state.settingsRow + 2) % 3;
+        state.settingsRow = (state.settingsRow + SETTINGS_ROW_COUNT - 1) % SETTINGS_ROW_COUNT;
         playUIMoveBlip();
         return;
       }
       if (Input.pressed("Down")) {
-        state.settingsRow = (state.settingsRow + 1) % 3;
+        state.settingsRow = (state.settingsRow + 1) % SETTINGS_ROW_COUNT;
         playUIMoveBlip();
         return;
       }
@@ -1291,11 +1320,19 @@ export const SelectScreen = {
         playUIMoveBlip();
         return;
       }
-      if (Input.pressed("Confirm") && state.settingsRow === 2) {
-        clearExpandedCatalogCache();
-        persist();
-        playUIConfirmBlip();
-        return;
+      if (Input.pressed("Confirm")) {
+        if (state.settingsRow === 2) {
+          clearExpandedCatalogCache();
+          persist();
+          playUIConfirmBlip();
+          return;
+        }
+        if (state.settingsRow === 3) {
+          state.settingsOpen = false;
+          persistSelectSettingsNow();
+          playUIBackBlip();
+          return;
+        }
       }
       if (mouse?.clicked) {
         const r = settingsOverlayRect();
@@ -1308,7 +1345,14 @@ export const SelectScreen = {
         const row1Y = r.y + 30;
         const row2Y = r.y + 62;
         const row3Y = r.y + 94;
-        const row = Math.abs(mouse.y - row1Y) < 12 ? 0 : (Math.abs(mouse.y - row2Y) < 12 ? 1 : (Math.abs(mouse.y - row3Y) < 12 ? 2 : -1));
+        const row4Y = r.y + 126;
+        const row = Math.abs(mouse.y - row1Y) < 12
+          ? 0
+          : (Math.abs(mouse.y - row2Y) < 12
+            ? 1
+            : (Math.abs(mouse.y - row3Y) < 12
+              ? 2
+              : (Math.abs(mouse.y - row4Y) < 12 ? 3 : -1)));
         if (row >= 0) {
           state.settingsRow = row;
           const dir = mouse.x < (r.x + r.w / 2) ? -1 : +1;
@@ -1323,9 +1367,12 @@ export const SelectScreen = {
             const next = searchModes[(idx + dir + searchModes.length) % searchModes.length];
             applySearchEngineMode(next);
             persistSelectSettingsNow();
-          } else {
+          } else if (row === 2) {
             clearExpandedCatalogCache();
             persist();
+          } else {
+            state.settingsOpen = false;
+            persistSelectSettingsNow();
           }
           playUIMoveBlip();
         }
@@ -1499,6 +1546,48 @@ export const SelectScreen = {
 
       if (handledSearch) return;
     } catch {}
+
+    if (mouse?.clicked) {
+      const sr = searchRects({ SCREEN, L });
+
+      if (pointInRect(mouse.x, mouse.y, sr.leftOuter)) {
+        state.archetypeIndex = 0;
+        state.archetypeConfirmed = false;
+        const next = randomizeSlots({ SLOT_COUNT: state.SLOT_COUNT, baseLen: baseVisible.length, displayToBase });
+        if (next) state.slots = next;
+        if (Array.isArray(state.expandedSlotOverrides)) {
+          state.expandedSlotOverrides = new Array(state.SLOT_COUNT).fill(null);
+        }
+        state.confirmPending = false;
+        persist();
+        playUIMoveBlip();
+        onPressRandomizeMaybeStartTrial();
+        return;
+      }
+
+      if (pointInRect(mouse.x, mouse.y, sr.left)) {
+        state.searchQuery = "";
+        try {
+          ensureSearchState(state);
+          closeSearchDropdown(state);
+          if (state.search?.pickSlotMode) exitPickSlotMode(state);
+        } catch {}
+        persist();
+        playUIConfirmBlip();
+        return;
+      }
+
+      if (pointInRect(mouse.x, mouse.y, sr.right)) {
+        state.focus = "search";
+        triggerSearchEnter();
+        try {
+          updateSearchFromQueue(state, baseVisible, { SCREEN, L, Input });
+        } catch {}
+        persist();
+        playUIConfirmBlip();
+        return;
+      }
+    }
 
     if (mouse?.clicked && pointInRect(mouse.x, mouse.y, settingsButtonRect())) {
       state.settingsOpen = !state.settingsOpen;
@@ -1711,7 +1800,15 @@ export const SelectScreen = {
       !state.search?.pickSlotMode;
 
     if (searchWantsKeyboard) {
-      focusSelectTextInput(state);
+      focusSelectTextInput(state, {
+        onEnter: () => {
+          triggerSearchEnter();
+          try {
+            updateSearchFromQueue(state, baseVisible, { SCREEN, L, Input });
+          } catch {}
+          persist();
+        }
+      });
     } else {
       blurSelectTextInput();
     }
@@ -1770,14 +1867,27 @@ export const SelectScreen = {
     // Search row
     const sr = searchRects({ SCREEN, L });
     const s = L?.search || {};
+    const iconFont = s.iconFont || "13px monospace";
+    const drawSearchIcon = (rect, icon, dx = 0, dy = 0) => {
+      ctx.fillStyle = C().panel || "#111";
+      ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+      ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+      const prevAlign = ctx.textAlign;
+      const prevBase = ctx.textBaseline;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = C().text || "#fff";
+      ctx.font = iconFont;
+      ctx.fillText(icon, rect.x + rect.w / 2 + dx, rect.y + rect.h / 2 + dy);
+      ctx.textAlign = prevAlign;
+      ctx.textBaseline = prevBase;
+    };
 
-    ctx.fillStyle = C().panel || "#111";
-    ctx.fillRect(sr.left.x, sr.left.y, sr.left.w, sr.left.h);
+    ctx.strokeStyle = C().stroke || "#555";
+    drawSearchIcon(sr.leftOuter, "⟳", 0, 0);
+
     ctx.strokeStyle = state.focus === "search" ? C().highlight || "#ff0" : C().stroke || "#555";
-    ctx.strokeRect(sr.left.x, sr.left.y, sr.left.w, sr.left.h);
-    ctx.fillStyle = C().text || "#fff";
-    ctx.font = s.iconFont || "13px monospace";
-    ctx.fillText("✕", sr.left.x + 5, sr.left.y + 15);
+    drawSearchIcon(sr.left, "X", 0, 0);
 
     ctx.fillStyle = C().panel || "#111";
     ctx.fillRect(sr.mid.x, sr.mid.y, sr.mid.w, sr.mid.h);
@@ -1814,22 +1924,23 @@ export const SelectScreen = {
       }
     }
 
-    ctx.fillStyle = C().panel || "#111";
-    ctx.fillRect(sr.right.x, sr.right.y, sr.right.w, sr.right.h);
     ctx.strokeStyle = state.focus === "search" ? C().highlight || "#ff0" : C().stroke || "#555";
-    ctx.strokeRect(sr.right.x, sr.right.y, sr.right.w, sr.right.h);
-    ctx.fillStyle = C().text || "#fff";
-    ctx.font = s.iconFont || "13px monospace";
-    ctx.fillText("⌕", sr.right.x + 5, sr.right.y + 15);
+    drawSearchIcon(sr.right, "↵", 0, 0);
 
     const sb = settingsButtonRect();
     ctx.fillStyle = C().panel || "#111";
     ctx.fillRect(sb.x, sb.y, sb.w, sb.h);
     ctx.strokeStyle = state.settingsOpen ? (C().highlight || "#ff0") : (C().stroke || "#555");
     ctx.strokeRect(sb.x, sb.y, sb.w, sb.h);
+    const prevAlign = ctx.textAlign;
+    const prevBase = ctx.textBaseline;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
     ctx.fillStyle = C().text || "#fff";
-    ctx.font = "11px monospace";
-    ctx.fillText("S", sb.x + 6, sb.y + 14);
+    ctx.font = "13px monospace";
+    ctx.fillText("⚙", sb.x + sb.w / 2, sb.y + sb.h / 2);
+    ctx.textAlign = prevAlign;
+    ctx.textBaseline = prevBase;
 
     // Slots
     const arrowFont = S()?.arrowFont || "13px monospace";
@@ -2035,6 +2146,7 @@ export const SelectScreen = {
       const rowY1 = r.y + 30;
       const rowY2 = r.y + 62;
       const rowY3 = r.y + 94;
+      const rowY4 = r.y + 126;
 
       ctx.fillStyle = state.settingsRow === 0 ? (C().highlight || "#ff0") : (C().text || "#fff");
       ctx.font = "11px monospace";
@@ -2043,6 +2155,8 @@ export const SelectScreen = {
       ctx.fillText(`search engine: < ${searchPretty} >`, r.x + 12, rowY2);
       ctx.fillStyle = state.settingsRow === 2 ? (C().highlight || "#ff0") : (C().text || "#fff");
       ctx.fillText("clear expanded cache", r.x + 12, rowY3);
+      ctx.fillStyle = state.settingsRow === 3 ? (C().highlight || "#ff0") : (C().text || "#fff");
+      ctx.fillText("back", r.x + 12, rowY4);
     }
     // confirm banner
     if (state.confirmPending) {

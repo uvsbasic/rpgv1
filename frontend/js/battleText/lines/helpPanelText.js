@@ -61,3 +61,35 @@ export const HELP_PANEL_RUNTIME_TEXT = {
     moveName: "Special"
   }
 };
+
+function renderTemplate(str, vars) {
+  return String(str || "").replace(/\{(\w+)\}/g, (_, k) => (vars[k] != null ? String(vars[k]) : `{${k}}`));
+}
+
+function normalizeTargetKey(itemDef) {
+  const key = String(itemDef?.target || itemDef?.targetType || itemDef?.useOn || "").trim().toLowerCase();
+  if (!key) return "generic";
+  if (key === "ally" || key === "allies" || key === "party") return "ally";
+  if (key === "self" || key === "self_only" || key === "selfonly" || key === "caster") return "self";
+  return "generic";
+}
+
+export function buildItemHelpText(entry, getInventoryItemDef) {
+  const def = typeof getInventoryItemDef === "function" ? getInventoryItemDef(entry) : null;
+  const name = String(def?.name || entry?.name || HELP_PANEL_TEXT.unknownItem);
+  const targetKey = normalizeTargetKey(def);
+
+  if (targetKey === "ally") {
+    return renderTemplate(HELP_PANEL_RUNTIME_TEXT.bodyTemplate.itemHelpAlly, { name });
+  }
+  if (targetKey === "self") {
+    return renderTemplate(HELP_PANEL_RUNTIME_TEXT.bodyTemplate.itemHelpSelf, { name });
+  }
+  return renderTemplate(HELP_PANEL_RUNTIME_TEXT.bodyTemplate.itemHelpGeneric, { name });
+}
+
+export function buildItemTargetBody({ itemDef, targetName } = {}) {
+  const name = String(itemDef?.name || HELP_PANEL_RUNTIME_TEXT.fallback.itemName);
+  const target = String(targetName || HELP_PANEL_RUNTIME_TEXT.fallback.targetName);
+  return `${name} -> ${target}`;
+}

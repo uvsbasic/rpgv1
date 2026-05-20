@@ -109,7 +109,7 @@ export function syncSelectTextInput({ state, SCREEN, L, searchRects }) {
  * Focuses the hidden input and wires live updates to state.searchQuery.
  * Call when user clicks/taps the search bar OR when focus becomes "search".
  */
-export function focusSelectTextInput(state, { onChange } = {}) {
+export function focusSelectTextInput(state, { onChange, onEnter } = {}) {
   const el = ensureSelectTextInput();
   if (!state) return;
 
@@ -124,14 +124,24 @@ export function focusSelectTextInput(state, { onChange } = {}) {
     state.searchQuery = String(el.value || "");
     if (typeof onChange === "function") onChange(state.searchQuery);
   };
+  const onKeyDown = (ev) => {
+    if (ev?.key !== "Enter") return;
+    try { ev.preventDefault(); } catch {}
+    if (typeof onEnter === "function") onEnter();
+  };
 
   // Remove previous
   try {
     el.removeEventListener("input", el.__selectOnInput);
   } catch {}
+  try {
+    if (el.__selectOnKeyDown) el.removeEventListener("keydown", el.__selectOnKeyDown);
+  } catch {}
 
   el.__selectOnInput = handler;
+  el.__selectOnKeyDown = onKeyDown;
   el.addEventListener("input", handler);
+  el.addEventListener("keydown", onKeyDown);
 
   // Focus + place cursor at end
   try {
@@ -155,6 +165,9 @@ export function blurSelectTextInput() {
 
   try {
     if (el.__selectOnInput) el.removeEventListener("input", el.__selectOnInput);
+  } catch {}
+  try {
+    if (el.__selectOnKeyDown) el.removeEventListener("keydown", el.__selectOnKeyDown);
   } catch {}
 
   try { el.blur(); } catch {}

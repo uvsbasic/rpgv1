@@ -3,7 +3,7 @@
 import { GameState, changeScreen } from "../game.js";
 import { SCREEN, LEGACY_320, INTRO_LAYOUT } from "../layout.js";
 import { Input } from "../ui.js";
-import { enemies } from "../data/enemies.js";
+import { enemies } from "../data/enemies/enemies.js";
 import { movies } from "../data/movies.js"; // needed for Dev preset party resolution
 import { ensureStatsState } from "../systems/statsSystem.js";
 import { playUIConfirmBlip } from "../sfx/uiSfx.js";

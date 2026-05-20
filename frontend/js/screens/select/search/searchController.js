@@ -54,7 +54,9 @@ export function ensureSearchControllerState(state) {
       inFlightKey: null,
       requestSeq: 0,
       tmdbProvider: null,
-      tmdbProviderApiKey: ""
+      tmdbProviderApiKey: "",
+      debounceTimer: null,
+      debounceKey: null
     };
   } else {
     if (!state.search.controller.cache || typeof state.search.controller.cache !== "object") {
@@ -65,6 +67,12 @@ export function ensureSearchControllerState(state) {
     }
     if (!Number.isFinite(Number(state.search.controller.requestSeq))) {
       state.search.controller.requestSeq = 0;
+    }
+    if (state.search.controller.debounceTimer !== null && typeof state.search.controller.debounceTimer !== "number") {
+      state.search.controller.debounceTimer = null;
+    }
+    if (typeof state.search.controller.debounceKey !== "string" && state.search.controller.debounceKey !== null) {
+      state.search.controller.debounceKey = null;
     }
   }
 }
@@ -93,6 +101,20 @@ function cacheKey(mode, query, baseVisibleLen, limit) {
   return `${mode}|${String(query || "").trim().toLowerCase()}|${baseVisibleLen}|${limit}`;
 }
 
+function findBestPrefixCacheHit(cache, mode, query, baseVisibleLen, limit) {
+  if (!cache || typeof cache !== "object") return null;
+  const q = String(query || "").trim().toLowerCase();
+  if (!q) return null;
+  const parts = [];
+  for (let i = q.length - 1; i >= 2; i--) parts.push(q.slice(0, i));
+  for (const p of parts) {
+    const k = cacheKey(mode, p, baseVisibleLen, limit);
+    const hit = cache[k];
+    if (Array.isArray(hit) && hit.length) return hit;
+  }
+  return null;
+}
+
 export function getSearchMode(state) {
   ensureSearchControllerState(state);
   return normalizeMode(state?.search?.mode);
@@ -106,6 +128,13 @@ export function setSearchMode(state, mode) {
   safeSetLS(SEARCH_MODE_KEY, next);
 
   if (prev !== next) {
+    try {
+      if (state.search.controller.debounceTimer != null) {
+        clearTimeout(state.search.controller.debounceTimer);
+        state.search.controller.debounceTimer = null;
+      }
+    } catch {}
+    state.search.controller.debounceKey = null;
     state.search.suggestions = [];
     state.search.selectedSuggestion = 0;
     state.search.dropdownBox = null;
@@ -134,24 +163,58 @@ export function requestSuggestions(state, { query, baseVisible, limit = 6, onRes
     return;
   }
 
+  // Snappy UX: immediately show closest prefix cache while we fetch.
+  // This avoids a blank/laggy dropdown during network round-trips.
+  const prefixHit = findBestPrefixCacheHit(ctl.cache, mode, q, src.length, limit);
+  if (prefixHit && typeof onResults === "function") {
+    onResults(prefixHit);
+  }
+
   if (ctl.inFlightKey === key) return;
 
-  ctl.inFlightKey = key;
-  ctl.requestSeq += 1;
-  const seq = ctl.requestSeq;
+  const runFetch = () => {
+    ctl.debounceKey = null;
+    ctl.inFlightKey = key;
+    ctl.requestSeq += 1;
+    const seq = ctl.requestSeq;
 
-  const provider = getProviderForMode(state);
-  Promise.resolve(provider.search({ query: q, baseVisible: src, limit }))
-    .then((results) => {
-      const out = Array.isArray(results) ? results : [];
-      ctl.cache[key] = out;
-      if (seq !== ctl.requestSeq) return;
-      if (ctl.inFlightKey === key) ctl.inFlightKey = null;
-      if (typeof onResults === "function") onResults(out);
-    })
-    .catch(() => {
-      if (seq !== ctl.requestSeq) return;
-      if (ctl.inFlightKey === key) ctl.inFlightKey = null;
-      if (typeof onResults === "function") onResults([]);
-    });
+    const provider = getProviderForMode(state);
+    Promise.resolve(provider.search({ query: q, baseVisible: src, limit }))
+      .then((results) => {
+        const out = Array.isArray(results) ? results : [];
+        if (mode !== MODE_EXPANDED || out.length > 0) {
+          ctl.cache[key] = out;
+        }
+        if (seq !== ctl.requestSeq) return;
+        if (ctl.inFlightKey === key) ctl.inFlightKey = null;
+        if (typeof onResults === "function") onResults(out);
+      })
+      .catch(() => {
+        if (seq !== ctl.requestSeq) return;
+        if (ctl.inFlightKey === key) ctl.inFlightKey = null;
+        if (typeof onResults === "function") onResults([]);
+      });
+  };
+
+  const debounceMs = 0;
+  if (debounceMs <= 0) {
+    runFetch();
+    return;
+  }
+
+  try {
+    if (ctl.debounceTimer != null && ctl.debounceKey !== key) {
+      clearTimeout(ctl.debounceTimer);
+      ctl.debounceTimer = null;
+    }
+  } catch {}
+  if (ctl.debounceTimer != null && ctl.debounceKey === key) {
+    // Already scheduled for this exact query; do not reset every frame.
+    return;
+  }
+  ctl.debounceKey = key;
+  ctl.debounceTimer = setTimeout(() => {
+    ctl.debounceTimer = null;
+    runFetch();
+  }, debounceMs);
 }

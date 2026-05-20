@@ -1,4 +1,4 @@
-// frontend/js/data/enemyMoves.js
+// frontend/js/data/enemies/enemyMoves.js
 //
 // Registry of enemy moves.
 // Each move is a small definition with an effect key + some numbers.

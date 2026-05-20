@@ -131,6 +131,7 @@ export const CampaignUnlockScreen = {
 
   render(ctx) {
     const payload = getPayload() || {};
+    const isMovieUnlock = String(payload?.type || "") === "MOVIE_UNLOCKED";
     const archetypeName = payload.archetypeName || "Unknown";
     const codeLabel = payload.codeLabel || "";
     const party = (payload.movieIds || []).slice(0, 4).map(getMovieById).filter(Boolean);
@@ -146,7 +147,7 @@ export const CampaignUnlockScreen = {
 
     ctx.fillStyle = "#ff0";
     ctx.font = "11px monospace";
-    ctx.fillText("Secret Unlocked!", Math.floor(width / 2), 24);
+    ctx.fillText(isMovieUnlock ? "Movie Unlocked!" : "Secret Unlocked!", Math.floor(width / 2), 24);
 
     ctx.fillStyle = "#fff";
     ctx.font = "8px monospace";

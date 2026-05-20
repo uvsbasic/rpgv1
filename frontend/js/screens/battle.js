@@ -5,6 +5,7 @@ import { GameState } from "../core/GameState.js";
 import { SCREEN, BATTLE_LAYOUT } from "../layout.js";
 import { Input } from "../ui.js";
 import { specials } from "../data/specials.js";
+import { buildSpecialsMapWithBonusPages } from "../data/matinee/bonusSpecialsLoadout.js";
 import { items } from "../data/items.js";
 import { movieMeta } from "../data/movieMeta.js";
 import { openingKits, eggKits } from "../data/starterKits.js";
@@ -40,6 +41,7 @@ import {
   recordWinForPartyMovies
 } from "../systems/statsSystem.js";
 import { popNextScreenUnlockEvent, runUnlockTriggers } from "../systems/unlockTriggers.js";
+import { unlockArchetype } from "../systems/unlockSystem.js";
 import { ensureMatineeState, recordCampaignBattleResult } from "../data/matinee/storage.js";
 import { discoverSetsFromRoster } from "../data/matinee/extraDiscovery.js";
 import { evaluateExtraMovieUnlocks } from "../data/matinee/extraSystems.js";
@@ -73,7 +75,7 @@ import { pickFamilyBgm } from "../data/bgmFamilies.js";
 import { buildEnemyIntroLines } from "../battleText/engines/buildEnemyMetaLines.js";
 
 import { createBattleMessageBox } from "../ui/battleMessageBox.js";
-import { getBattleHelpPanelText, ACTION_DESCRIPTIONS } from "../ui/battleHelpPanel.js";
+import { getBattleHelpPanelText, ACTION_DESCRIPTIONS } from "../battleText/engines/buildHelpPanelText.js";
 import { renderBattleCharacterSlots } from "../ui/battleCharacterSlots.js";
 
 import { tickActorStatuses, tickEnemyStatuses } from "../systems/statusTickSystem.js";
@@ -958,17 +960,19 @@ function ensureEnemyExists() {
   state.enemy = spawned;
 }
 
+const SPECIALS_MAP = buildSpecialsMapWithBonusPages(specials);
+
 // ===== SPECIAL PAGES (wrappers) =====
 function canToggleSpecialPages(actor) {
-  return canToggleSpecialPagesExt(actor, specials);
+  return canToggleSpecialPagesExt(actor, SPECIALS_MAP);
 }
 
 function getSpecialPageCount(movieId) {
-  return getSpecialPageCountExt(movieId, specials);
+  return getSpecialPageCountExt(movieId, SPECIALS_MAP);
 }
 
 function getSignatureMapForActorPage(actor, pageIndex) {
-  return getSignatureMapForActorPageExt(actor, pageIndex, specials);
+  return getSignatureMapForActorPageExt(actor, pageIndex, SPECIALS_MAP);
 }
 
 function resolveSpecialsForActorCurrentPage(actor) {
@@ -976,7 +980,7 @@ function resolveSpecialsForActorCurrentPage(actor) {
     actor,
     pageIndex: state.specialsPageIndex,
     movieMetaMap: movieMeta,
-    specialsMap: specials,
+    specialsMap: SPECIALS_MAP,
     getResolvedSpecialsForActor
   });
 }
@@ -1368,22 +1372,14 @@ function continueVictoryFlow() {
   const isQuickplay = state.battleRunMode === "quickplay";
   const isCampaign = state.battleIsCampaign;
   const isEggBattle = String(GameState?.specialFlow?.type || "") === "eggBattle";
+  const eggBattleEntrySource = String(GameState?.flags?.secrets?.eggBattleEntrySource || "");
+  const isReportBugsEggBattle = eggBattleEntrySource === "reportbugs";
 
   incWins(GameState, 1);
   recordWinForPartyMovies(GameState, GameState.party.movies);
 
   const rosterIds = (GameState.party.movies || []).map((m) => String(m?.id || "")).filter(Boolean);
   const activeArchetypeId = String(GameState?.flags?.activeArchetypeId || "");
-  const discovered = discoverSetsFromRoster(GameState, rosterIds);
-  const activeSetIds = Array.isArray(discovered) && discovered.length
-    ? discovered
-    : (Array.isArray(GameState?.campaign?.activeMatineeSetIds) ? GameState.campaign.activeMatineeSetIds : []);
-  recordCampaignBattleResult(GameState, {
-    won: true,
-    rosterMovieIds: rosterIds,
-    archetypeId: activeArchetypeId,
-    activeSetIds
-  });
 
   const curLevel = GameState.currentLevel || 1;
   const maxLevel = getCampaignMaxLevel(GameState);
@@ -1400,14 +1396,36 @@ function continueVictoryFlow() {
   // Egg-battle shortcut should never count as a true campaign clear.
   const campaignCleared = isCampaign && !isEggBattle && curLevel >= maxLevel;
   if (campaignCleared) {
+    if (!isReportBugsEggBattle) {
+      const discovered = discoverSetsFromRoster(GameState, rosterIds);
+      const activeSetIds = Array.isArray(discovered) && discovered.length
+        ? discovered
+        : (Array.isArray(GameState?.campaign?.activeMatineeSetIds) ? GameState.campaign.activeMatineeSetIds : []);
+      // Important: "wins_with_*" counters represent completed campaign wins, not per-battle wins.
+      recordCampaignBattleResult(GameState, {
+        won: true,
+        rosterMovieIds: rosterIds,
+        archetypeId: activeArchetypeId,
+        activeSetIds
+      });
+    }
     setStat(GameState, "campaignCleared", true);
     incStat(GameState, "campaignCompletions", 1);
     completeRatatouilleTrialIfActive(GameState);
   }
 
-  runUnlockTriggers(GameState, null);
-  evaluateExtraMovieUnlocks(GameState);
+  if (isReportBugsEggBattle) {
+    // Report-bugs secret route only grants these two archetypes.
+    unlockArchetype(GameState, "directors_cut_purist");
+    unlockArchetype(GameState, "test_test");
+  } else {
+    runUnlockTriggers(GameState, null);
+    evaluateExtraMovieUnlocks(GameState);
+  }
   onMatineeBattleEnd(GameState, state.party);
+  if (isReportBugsEggBattle && GameState?.flags?.secrets?.eggBattleEntrySource) {
+    delete GameState.flags.secrets.eggBattleEntrySource;
+  }
 
   battleInitialized = false;
 
@@ -2531,12 +2549,14 @@ function handleDefeatReturnToMenu() {
   ensureMatineeState(GameState);
 
   const isQuickplay = GameState.runMode === "quickplay";
+  const eggBattleEntrySource = String(GameState?.flags?.secrets?.eggBattleEntrySource || "");
+  const isReportBugsEggBattle = eggBattleEntrySource === "reportbugs";
   if (isQuickplay) GameState.runMode = null;
 
   completeRatatouilleTrialIfActive(GameState);
 
   if (state.defeatReason !== "RUN") incLosses(GameState, 1);
-  if (GameState.runMode === "campaign") {
+  if (GameState.runMode === "campaign" && !isReportBugsEggBattle) {
     const rosterIds = (GameState.party.movies || []).map((m) => String(m?.id || "")).filter(Boolean);
     const activeArchetypeId = String(GameState?.flags?.activeArchetypeId || "");
     recordCampaignBattleResult(GameState, {
@@ -2548,8 +2568,11 @@ function handleDefeatReturnToMenu() {
     evaluateExtraMovieUnlocks(GameState);
   }
 
-  runUnlockTriggers(GameState, null);
+  if (!isReportBugsEggBattle) runUnlockTriggers(GameState, null);
   onMatineeBattleEnd(GameState, state.party);
+  if (isReportBugsEggBattle && GameState?.flags?.secrets?.eggBattleEntrySource) {
+    delete GameState.flags.secrets.eggBattleEntrySource;
+  }
 
   GameState.campaign = null;
   GameState.party.movies = [null, null, null, null];
@@ -2715,7 +2738,7 @@ const BattleScreenObj = {
             state,
             actor,
             movieMetaMap: movieMeta,
-            specialsMap: specials,
+            specialsMap: SPECIALS_MAP,
             getResolvedSpecialsForActor
           })
         );
